@@ -3,7 +3,6 @@ pragma solidity >=0.4.21 <0.6.0;
 
 import "./SutProxyConfig.sol";
 
-import "./TokenRecipient.sol";
 
 
 
@@ -13,7 +12,8 @@ import "./TokenRecipient.sol";
 
  */
 
-contract SutProxy is tokenRecipient,SutProxyConfig{
+
+contract SutProxy is SutProxyConfig{
 
     enum State {
 
@@ -21,10 +21,12 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
 
     }
 
-    // project name and address mapping
+    
     event Flagging(address _projectAddress, address _flagger, uint256 _deposit, uint256 _totalDeposit);
 
     event MarketCreated(address marketAddress, address marketCreator, uint256 initialDeposit);
+
+    event BuyCt(address _ctAddress, address _buyer, uint256 _amount, uint256 _costSut);
 
     event AppealMarket(address _ctAddress, address _appealer, uint256 _depositAmount);
 
@@ -46,58 +48,6 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
 
     }
 
-    function receiveApproval(address sutOwner, uint256 approvedSutAmount, address token, bytes calldata extraData) external {
-
-        require(msg.sender == address(SUT));
-
-        require(token == address(SUT));
-
-        (uint8 action, address ctAddress) = _unpack(_bytesToUint256(extraData, 0));
-
-        if (action == CREATE_MARKET_ACTION) {
-
-            createMarket(sutOwner, approvedSutAmount);
-
-        } else if (action == FLAG_MARKET_ACTION) {
-
-           flag(ctAddress, sutOwner, approvedSutAmount);
-
-        } else if (action == APPEAL_MARKET_ACTION) {
-
-           appeal(ctAddress, sutOwner, approvedSutAmount);
-
-        } else {
-
-            // unexpected action value
-
-            revert();
-
-        }
-
-    }
-
-
-    // Utility function to convert bytes type to uint256. Noone but this contract can call this function.
-
-    function _bytesToUint256(bytes memory input, uint offset) internal pure returns (uint256 output) {
-
-        assembly {output := mload(add(add(input, 32), offset))}
-
-    }
-
-
-    function _unpack(uint256 data) internal pure returns (uint8 action, address ctAddress) {
-
-        action = uint8(data);
-
-        //uint160 _ctAddress = uint160(data >> 8);
-
-        ctAddress = address(uint160(data >> 8));
-
-        // amount = uint88(data >> 168);
-
-    }
-
 
     /**********************************************************************************
 
@@ -109,15 +59,22 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
 
      **********************************************************************************/
     
-    function createMarket(address marketCreator, uint256 initialDeposit) private {
+    function createMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate) public returns(address _ctAddress){
+        require(msg.sender == address(exchange)); 
 
         require(initialDeposit == CREATE_MARKET_DEPOSIT_REQUIRED);
 
+        require(exchange.balanceOf(address(SUT), marketCreator) >= initialDeposit);
+
         require(NTT.isAllow(marketCreator, CREATE_MARKET_NTT_KEY), "Not enough NTT");
 
-        require(SUT.transferFrom(marketCreator, sutStoreAddress, initialDeposit), "SUT transfer unsuccessful");
+        require(_supply > 0);
+        
+        require(_rate > 0 && _lastRate > 0);
 
-        sutImpl._newCtMarket(marketCreator,initialDeposit);
+        //require(SUT.transferFrom(marketCreator, sutStoreAddress, initialDeposit), "SUT transfer unsuccessful");
+
+        _ctAddress = sutImpl._newCtMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate, _lastRate);
 
     }
 
@@ -126,6 +83,35 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
        emit MarketCreated(_ctAddress,_marketCreator,_initialDeposit);
 
     }
+
+    /**********************************************************************************
+
+     *                                                                                *
+
+     * First Period Buy Ct session                                                                     *
+
+     *                                                                                *
+
+     **********************************************************************************/
+    
+    function addHolder(address _ctAddress, address _holder)public{
+        require(msg.sender == address(exchange));
+
+        sutImpl._addHolder(_ctAddress, _holder);
+    }
+
+    function removeHolder(address _ctAddress, address _holder)public{
+        require(msg.sender == address(exchange));
+
+        sutImpl._removeHolder(_ctAddress,_holder);
+    }
+
+    function finishCtFirstPeriod(address _ctAddress)public{
+        require(msg.sender == address(exchange));
+
+        sutImpl._finishCtFirstPeriod(_ctAddress);
+    }
+
 
     /**********************************************************************************
 
@@ -217,10 +203,6 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
         emit DissolvedCtMarket(ctAddress);
 
     }
-
-
-    
-
 
 
     //other function for view 
@@ -326,6 +308,8 @@ contract SutProxy is tokenRecipient,SutProxyConfig{
         return sutImpl._marketSize();
 
     }
+
+
 
 }
 

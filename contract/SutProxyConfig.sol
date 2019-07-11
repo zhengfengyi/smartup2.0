@@ -4,6 +4,12 @@ import "./IGradeable.sol";
 import "./ISmartIdeaToken.sol";
 import "./SutImplUpgradeable.sol";
 
+interface Exchange {
+
+    function balanceOf(address _token, address _owner)external view returns (uint256 _amount);
+    
+}
+
 
 contract SutProxyConfig is Ownable, SutImplUpgradeable{
     
@@ -12,6 +18,8 @@ contract SutProxyConfig is Ownable, SutImplUpgradeable{
     ISmartIdeaToken public SUT;
 
     address public sutStoreAddress;
+
+    Exchange exchange;
 
     event SetSutStoreAddress(address _sutStoreAddress);
 
@@ -35,19 +43,19 @@ contract SutProxyConfig is Ownable, SutImplUpgradeable{
     string constant CREATE_MARKET_NTT_KEY = "create_market";
 
     //set proxy config
-    function setFlaggingDeposite(uint256 minFlaggingDeposite)public onlyCoo {
+    function setFlaggingDeposite(uint256 minFlaggingDeposite)public onlyAdmin {
         MINIMUM_FLAGGING_DEPOSIT = minFlaggingDeposite;
     }
 
-    function setFlaggingDepositeRequired(uint256 flaggingDepositeRequired)public onlyCoo {
+    function setFlaggingDepositeRequired(uint256 flaggingDepositeRequired)public onlyAdmin {
         APPEALING_DEPOSIT_REQUIRED = flaggingDepositeRequired;
     }
 
-    function setAppealDeposit(uint256 appealDeposit)public onlyCoo {
+    function setAppealDeposit(uint256 appealDeposit)public onlyAdmin {
         APPEALING_DEPOSIT_REQUIRED = appealDeposit;
     }
 
-    function setMarketCreatDeposit(uint256 marketCreatedDeposit)public onlyCoo {
+    function setMarketCreatDeposit(uint256 marketCreatedDeposit)public onlyAdmin {
         CREATE_MARKET_DEPOSIT_REQUIRED = marketCreatedDeposit;
     }
 
@@ -63,5 +71,9 @@ contract SutProxyConfig is Ownable, SutImplUpgradeable{
     
     function setSUTAddress(address _sutTokenAddress)public onlyOwner{
         SUT = ISmartIdeaToken(_sutTokenAddress);
+    }
+
+    function setExchangeAddress(address _exchange)public onlyOwner{
+        exchange = Exchange(_exchange);
     }
 }

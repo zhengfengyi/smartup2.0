@@ -2,22 +2,18 @@ pragma solidity >=0.4.21 <0.6.0;
 
 import "./CT.sol";
 
-interface ExSetAllowed {
-    function setAllowed(address allowed, bool _isAllowed)external;
-}
 
 contract CreateCtMarket is Ownable{
     address public implAddress;
     //address public calcSutAddress;
     address public exStore;
     address public storeAddress;
-    address public exImpl;
+ 
 
-    constructor(address _store, address _implAddress, address _exStore, address _exImpl)public Ownable(msg.sender) {
+    constructor(address _store, address _implAddress, address _exStore)public Ownable(msg.sender) {
         storeAddress = _store;
         implAddress = _implAddress;
         exStore = _exStore;
-        exImpl = _exImpl;
     }
 
     modifier onlyImpl(){
@@ -33,26 +29,36 @@ contract CreateCtMarket is Ownable{
     //     calcSutAddress = _calcsut;
     // }
     
-    // function setSutStore(address _store)public onlyOwner{
-    //     storeAddress = _store;
-    // }
+    function setSutStore(address _store)public onlyOwner{
+        storeAddress = _store;
+    }
 
 
-    function newCtMarket(address owner, address creator)external onlyImpl returns(address ctAddress){
+    function newCtMarket(address owner, address creator, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate)external onlyImpl returns(address ctAddress){
 
-        CT ct = new CT(owner, creator, storeAddress, exStore, exImpl, address(this));
+        CT ct = new CT(owner, creator, storeAddress, address(this), exStore, _name,_symbol,_supply,_rate, _lastRate);
 
         ctAddress = address(ct);
-
-        ExSetAllowed(exStore).setAllowed(ctAddress, true);
     }
 
-    function dissolve(address ctAddress)external onlyImpl returns(bool success){
-        success = CT(ctAddress).dissolve();
-    }
+    // function dissolve(address ctAddress)external onlyImpl returns(bool success){
+    //     success = CT(ctAddress).dissolve();
+    // }
 
     function trunDissolved(address ctAddress)external onlyImpl{
         CT(ctAddress).setDissolved();
+    }
+
+    function finishCtFirstPeriod(address ctAddress)external onlyImpl{
+        CT(ctAddress).finishFirstPeriod();
+    }
+
+    function addHolder(address ctAddress, address holder)external onlyImpl{
+        CT(ctAddress)._addHolder(holder);
+    }
+
+ function removeHolder(address ctAddress, address holder)external onlyImpl{
+        CT(ctAddress)._removeHolder(holder);
     }
 
 

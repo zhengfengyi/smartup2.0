@@ -14,9 +14,13 @@ import "./SutStore.sol";
  * @title SmartUp platform contract
 
  */
- 
-interface RateCalcSut{
-     function calcSut(uint256 existingCtCount, uint256 newCtCount)external view returns (int256);
+
+
+ interface CtMarket {
+    function isInFirstPeriod()external view returns(bool);
+    function rate()external returns(uint256); 
+    function lastRate()external returns(uint256);
+
  }
 
 
@@ -25,8 +29,6 @@ contract SutImpl is Ownable{
     SutProxy public sutProxy;
 
     SutStore public sutStore;
-
-    RateCalcSut public rateCalcSut;
 
     CtMiddleware public ctMiddleware;
 
@@ -42,27 +44,15 @@ contract SutImpl is Ownable{
 
     }
 
-    constructor(address payable _sutPorxy, address payable _sutStore, address _calsSut, address _ctMiddleware) public Ownable(msg.sender){
+    constructor(address payable _sutPorxy, address payable _sutStore, address _ctMiddleware) public Ownable(msg.sender){
 
         sutProxy = SutProxy(_sutPorxy);
 
         sutStore = SutStore(_sutStore);
 
-        rateCalcSut = RateCalcSut(_calsSut);
-
         ctMiddleware = CtMiddleware(_ctMiddleware);
     }
-
-    //change fomular 
-
-    function changeSutFomular(address _sutFomular)public onlyOwner {
-        rateCalcSut = RateCalcSut(_sutFomular);
-    }
     
-
-    function calcSut(uint256 existingCtCount, uint256 newCtCount)external view returns (int256){
-        return rateCalcSut.calcSut(existingCtCount,newCtCount);
-    }
 
 
     // we're not supposed to accept ETH?
@@ -74,9 +64,9 @@ contract SutImpl is Ownable{
     }
 
     
-    function _newCtMarket(address marketCreator, uint256 initialDeposit) external onlyProxy{
+    function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate) external onlyProxy returns(address){
         
-        address ctAddress = ctMiddleware.newCtMarket(owner(),marketCreator);
+        address ctAddress = ctMiddleware.newCtMarket(owner(),marketCreator,_name,_symbol,_supply,_rate, _lastRate);
 
         sutStore.setCtMarketCreator(ctAddress,marketCreator);
         sutStore.activeCtMarket(ctAddress);
@@ -85,7 +75,32 @@ contract SutImpl is Ownable{
         sutStore.pushCtMarket(ctAddress);
         
         sutProxy.emitMarketCreated(ctAddress, marketCreator, initialDeposit);
+
+        return ctAddress;
     }
+
+
+    /**********************************************************************************
+
+     *                                                                                *
+
+     * first period buy                                                                   *
+
+     *                                                                                *
+
+     **********************************************************************************/
+    function _addHolder(address _ctAddress, address _holder)public onlyProxy{
+        ctMiddleware.addHolder(_ctAddress, _holder);
+    }
+
+    function _removeHolder(address _ctAddress, address _holder)public onlyProxy{
+        ctMiddleware.removeHolder(_ctAddress, _holder);
+    }
+    
+    function _finishCtFirstPeriod(address _ctAddress)public onlyProxy{
+        ctMiddleware.finishCtFirstPeriod(_ctAddress);
+    }
+    
 
 
     /**********************************************************************************

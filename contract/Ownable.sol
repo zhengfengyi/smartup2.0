@@ -57,7 +57,7 @@ contract Ownable {
         return _owner;
     }
 
-    function setCoo(address _admin, bool _become)public onlyOwner{
+    function setAdmin(address _admin, bool _become)public onlyOwner{
         admin[_admin] = _become;
         emit SetAdmin(_admin, _become);
     }

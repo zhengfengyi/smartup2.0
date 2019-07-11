@@ -42,27 +42,27 @@ contract SutStoreConfig is Ownable{
     }
 
     //set Store Config
-    function setMinBallots(uint8 _minBallots)public onlyCoo{
+    function setMinBallots(uint8 _minBallots)public onlyAdmin{
         MINIMUM_BALLOTS = _minBallots;
     }
 
-    function setJurorCount(uint256 _jurorCount)public onlyCoo{
+    function setJurorCount(uint256 _jurorCount)public onlyAdmin{
         JUROR_COUNT = _jurorCount;
     }
 
-    function setProtectionPeriod(uint256 _period)public onlyCoo{
+    function setProtectionPeriod(uint256 _period)public onlyAdmin{
         PROTECTION_PERIOD = _period * 60;
     }
 
-    function setVotingPeriod(uint256 _period)public onlyCoo{
+    function setVotingPeriod(uint256 _period)public onlyAdmin{
         VOTING_PERIOD = _period * 60;
     }
 
-    function setFlaggingPeriod(uint256 _period)public onlyCoo{
+    function setFlaggingPeriod(uint256 _period)public onlyAdmin{
         FLAGGING_PERIOD = _period * 60;
     }
 
-    function setAppleingPeriod(uint256 _period)public onlyCoo{
+    function setAppleingPeriod(uint256 _period)public onlyAdmin{
         APPEALING_PERIOD = _period * 60;
     }
     
