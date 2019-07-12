@@ -23,12 +23,14 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
     mapping (address => mapping(address => uint256)) public tokenBalance;
     mapping (address => bool)private isAllowed;
 
-
+    
     event Deposit(address _token, address _owner, uint256 _amount, uint256 _total);
     event Withdraw(address _token, address _owner, uint256 _amount, uint256 _remain);
+    event BalanceChange(address _owner, uint256 _sutRemain, uint256 _ethRemain);
     event AdminWithdarw(address _withdrawer, address _token, address _owner, uint256 _value, uint256 _fee, uint256 _remain);
     event FirstPeriodBuyCt(address _ctAddress, address buyer, uint256 _amount, uint256 _costSut);
     event SellCt(address _ctAddress, address _seller, uint256 _amount, uint256 acquireSut);
+
     // event InternalTokenTransfer(address _token, address _from, address _to, uint256 _amount);
     // event SetTokenBalance(address _token, address _owner, uint256 _amount);
     // event AddTokenBalance(address _token, address _owner, uint256 _amount, uint256 _total);
@@ -185,17 +187,22 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
         
         tokenBalance[address(SUT)][marketCreator] = tokenBalance[address(SUT)][marketCreator].sub(fee);
         tokenBalance[_tokenAddress][_tokenAddress] = _supply;
+
+        emit BalanceChange(marketCreator,tokenBalance[address(SUT)][marketCreator],tokenBalance[address(0)][marketCreator]);
+
+        
    }
 
 
    function buyCt(address _tokenAddress, uint256 _amount)public {
+       require(_amount >= DECIMALS_RATE);
        ctMarket market = ctMarket(_tokenAddress);
        require(market.isInFirstPeriod() == true && market.dissolved() == false);
        require(tokenBalance[_tokenAddress][_tokenAddress] >= _amount);
-       uint256 costSut = _amount.mul(market.rate());
+       uint256 costSut = _amount.div(DECIMALS_RATE).mul(market.rate());
        require(tokenBalance[address(SUT)][msg.sender] >= costSut);
 
-       tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].sub(_amount);
+       tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].sub(_amount\);
        tokenBalance[_tokenAddress][msg.sender] = tokenBalance[_tokenAddress][msg.sender].add(_amount);
 
        tokenBalance[address(SUT)][_tokenAddress] = tokenBalance[address(SUT)][_tokenAddress].add(costSut);
@@ -212,11 +219,12 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
    }
 
    function sellCt(address _tokenAddress, uint256 _amount)public{
+       require(_amount >= DECIMALS_RATE);
        ctMarket market = ctMarket(_tokenAddress);
 
        require(market.isOver());
 
-       uint256 acquireSut = _amount.mul(market.lastRate());
+       uint256 acquireSut = _amount.div(DECIMALS_RATE).mul(market.lastRate());
 
        tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].add(_amount);
        tokenBalance[_tokenAddress][msg.sender] = tokenBalance[_tokenAddress][msg.sender].sub(_amount);

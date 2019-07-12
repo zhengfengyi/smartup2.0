@@ -29,8 +29,8 @@ contract CreateCtMarket is Ownable{
     //     calcSutAddress = _calcsut;
     // }
     
-    function setSutStore(address _store)public onlyOwner{
-        storeAddress = _store;
+    function setSutStore(address _exStore)public onlyOwner{
+        exStore = _exStore;
     }
 
 

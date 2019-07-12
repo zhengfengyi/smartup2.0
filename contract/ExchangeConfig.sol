@@ -27,7 +27,7 @@ interface SutProxy {
 
 contract ExchangeConfig {
     uint256 constant MIN_VALUE = 10 ** 15;
-    uint256 MIN_CREATE_DEPOSIT = 2500 * MIN_VALUE;
+    uint256 constant DECIMALS_RATE = 10 ** 18;
     address public feeAccount;
     SutProxy sutProxy;
     Token SUT;

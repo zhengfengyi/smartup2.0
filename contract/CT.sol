@@ -32,6 +32,7 @@ contract CT is ERC20, CtConfig{
     
     string public name;
     string public symbol;
+   
     IterableSet.AddressSet private _jurors; 
 
     IterableSet.AddressSet private _tokenHolders;
