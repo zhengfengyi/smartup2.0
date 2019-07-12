@@ -3,8 +3,9 @@
 #### 合约步骤
 
 ```
-1.SUT token合约 （ctConfig 需要设置）
-2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置）
+1.SUT token合约 （ctConfig 需要设置） 0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03
+2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置） 0x846ce03199a759a183cccb35146124cd3f120548
+
 3.sutStore 合约      0x6b0d0c9442eaf3079fbc9933900e17b1542e97da
    Gas Limit: 4027415
    Gas Price: 10 Gwei
@@ -52,11 +53,11 @@ Gas Price:
 
 8.SutStore 设置sutImplAddress
 
-9.SutProxy 设置sutImplAddress
+9.SutProxy 设置sutImplAddress 设置 Exchange地址
 
 10. SutProxy 设置 exchange Address
 
-11.CreateCtMarket 设置 sutImpl地址
+11.CreateCtMarket 设置 sutImpl地址  exchange地址
 
 ```
 
