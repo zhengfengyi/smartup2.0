@@ -91,9 +91,6 @@ address _token  代币合约地址（sut合约地址如果存的是ETH则为0x00
 address _owner 存钱的人
 uint256 _amount 存的数量
 uint256 _total   当前余额；
-
-
-
 ```
 
 #### 2.存ETH（调用的合约Exchange）
@@ -191,7 +188,7 @@ uint256 initialDeposit  创建市场的押金(2500SUT)
 string memory _name   市场名字（比如：smartupToken）
 string memory _symbol 市场简称（比如： SUT）
 uint256 _supply   CT 发行量（1 个 ct 为：1000000000000000000);
-uint256 _rate     第一阶段 CT 兑换 SUT 比例（1 个 sut 能换 10 个 ct 则为：10 ** 17）；
+uint256 _rate     第一阶段 CT 兑换 SUT 比例（1 个 ct 能换 0.1 个 sut 则为：10 ** 17）；
 uint256 _lastRate  市场最后的兑换价格(同 _rate)
 uint256 fee  创建市场的费用
 bytes memory signature 签名
