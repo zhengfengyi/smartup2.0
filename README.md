@@ -213,6 +213,16 @@ event BalanceChange(address _owner, uint256 _sutRemain, uint256 _ethRemain);
 address _owner  改变余额的地址
 uint256 _sutRemain  sut余额
 uint256 _ethRemain  eth余额
+
+消耗的gas信息：    //0xc492daed53502717c5adb5b5a3495cc1e09997f1
+Transaction Fee:
+0.01681122 Ether ($0.000000)
+Gas Limit:
+1,701,303
+Gas Used by Transaction:
+1,681,122 (98.81%)
+Gas Price:
+0.00000001 Ether (10 Gwei)
 ````
 
 #### 6.查询Ct市场价格（调用合约CT市场合约）
