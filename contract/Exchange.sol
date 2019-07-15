@@ -180,15 +180,17 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
         require(_creator == marketCreator);
 
         //fee
-        tokenBalance[address(0)][marketCreator] = tokenBalance[address(0)][marketCreator].sub(fee);
+        tokenBalance[address(0)][_creator] = tokenBalance[address(0)][_creator].sub(fee);
         tokenBalance[address(0)][feeAccount] = tokenBalance[address(0)][feeAccount].add(fee);
+
 
         address _tokenAddress = sutProxy.createMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate,_lastRate);
         
-        tokenBalance[address(SUT)][marketCreator] = tokenBalance[address(SUT)][marketCreator].sub(fee);
+        tokenBalance[address(SUT)][_creator] = tokenBalance[address(SUT)][_creator].sub(fee);
         tokenBalance[_tokenAddress][_tokenAddress] = _supply;
 
-        emit BalanceChange(marketCreator,tokenBalance[address(SUT)][marketCreator],tokenBalance[address(0)][marketCreator]);
+
+        emit BalanceChange(marketCreator,tokenBalance[address(SUT)][_creator],tokenBalance[address(0)][_creator]);
 
         
    }
@@ -199,10 +201,10 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        ctMarket market = ctMarket(_tokenAddress);
        require(market.isInFirstPeriod() == true && market.dissolved() == false);
        require(tokenBalance[_tokenAddress][_tokenAddress] >= _amount);
-       uint256 costSut = _amount.div(DECIMALS_RATE).mul(market.rate());
+       uint256 costSut = _amount.mul(market.rate()).div(DECIMALS_RATE);
        require(tokenBalance[address(SUT)][msg.sender] >= costSut);
 
-       tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].sub(_amount\);
+       tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].sub(_amount);
        tokenBalance[_tokenAddress][msg.sender] = tokenBalance[_tokenAddress][msg.sender].add(_amount);
 
        tokenBalance[address(SUT)][_tokenAddress] = tokenBalance[address(SUT)][_tokenAddress].add(costSut);
@@ -224,7 +226,7 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
        require(market.isOver());
 
-       uint256 acquireSut = _amount.div(DECIMALS_RATE).mul(market.lastRate());
+       uint256 acquireSut = _amount.mul(market.lastRate()).div(DECIMALS_RATE);
 
        tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].add(_amount);
        tokenBalance[_tokenAddress][msg.sender] = tokenBalance[_tokenAddress][msg.sender].sub(_amount);
@@ -239,8 +241,5 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        emit SellCt(_tokenAddress,msg.sender,_amount,acquireSut);
 
    }
-
-
-
 
 }
