@@ -186,7 +186,8 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
         address _tokenAddress = sutProxy.createMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate,_lastRate);
         
-        tokenBalance[address(SUT)][_creator] = tokenBalance[address(SUT)][_creator].sub(fee);
+        tokenBalance[address(SUT)][_creator] = tokenBalance[address(SUT)][_creator].sub(initialDeposit);
+        tokenBalance[(address(SUT))][_tokenAddress] = tokenBalance[(address(SUT))][_tokenAddress].add(initialDeposit);
         tokenBalance[_tokenAddress][_tokenAddress] = _supply;
 
 
@@ -197,7 +198,7 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
 
    function buyCt(address _tokenAddress, uint256 _amount)public {
-       require(_amount >= DECIMALS_RATE);
+       require(_amount >= MIN_VALUE);
        ctMarket market = ctMarket(_tokenAddress);
        require(market.isInFirstPeriod() == true && market.dissolved() == false);
        require(tokenBalance[_tokenAddress][_tokenAddress] >= _amount);
@@ -221,7 +222,7 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
    }
 
    function sellCt(address _tokenAddress, uint256 _amount)public{
-       require(_amount >= DECIMALS_RATE);
+       require(_amount >= MIN_VALUE);
        ctMarket market = ctMarket(_tokenAddress);
 
        require(market.isOver());
