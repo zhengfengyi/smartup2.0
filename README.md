@@ -218,7 +218,7 @@ uint256 _ethRemain  eth余额
 Transaction Fee:
 0.01681122 Ether ($0.000000)
 Gas Limit:
-1,701,303
+1,800,000
 Gas Used by Transaction:
 1,681,122 (98.81%)
 Gas Price:
