@@ -1,6 +1,6 @@
 pragma solidity >=0.4.21 <0.6.0;
 
-import "./CT.sol";
+import "./CTstore.sol";
 
 
 contract CreateCtMarket is Ownable{
@@ -34,9 +34,9 @@ contract CreateCtMarket is Ownable{
     }
 
 
-    function newCtMarket(address owner, address creator, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate)external onlyImpl returns(address ctAddress){
+    function newCtMarket(address owner, address creator, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime)external onlyImpl returns(address ctAddress){
 
-        CT ct = new CT(owner, creator, storeAddress, address(this), exStore, _name,_symbol,_supply,_rate, _lastRate);
+        CTstore ct = new CTstore(owner, creator, storeAddress, address(this), exStore, _name,_symbol,_supply,_rate, _lastRate, _closingTime);
 
         ctAddress = address(ct);
     }

@@ -64,9 +64,9 @@ contract SutImpl is Ownable{
     }
 
     
-    function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate) external onlyProxy returns(address){
+    function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime) external onlyProxy returns(address){
         
-        address ctAddress = ctMiddleware.newCtMarket(owner(),marketCreator,_name,_symbol,_supply,_rate, _lastRate);
+        address ctAddress = ctMiddleware.newCtMarket(owner(),marketCreator,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
 
         sutStore.setCtMarketCreator(ctAddress,marketCreator);
         sutStore.activeCtMarket(ctAddress);
@@ -89,17 +89,17 @@ contract SutImpl is Ownable{
      *                                                                                *
 
      **********************************************************************************/
-    function _addHolder(address _ctAddress, address _holder)public onlyProxy{
-        ctMiddleware.addHolder(_ctAddress, _holder);
-    }
+    // function _addHolder(address _ctAddress, address _holder)public onlyProxy{
+    //     ctMiddleware.addHolder(_ctAddress, _holder);
+    // }
 
-    function _removeHolder(address _ctAddress, address _holder)public onlyProxy{
-        ctMiddleware.removeHolder(_ctAddress, _holder);
-    }
+    // function _removeHolder(address _ctAddress, address _holder)public onlyProxy{
+    //     ctMiddleware.removeHolder(_ctAddress, _holder);
+    // }
     
-    function _finishCtFirstPeriod(address _ctAddress)public onlyProxy{
-        ctMiddleware.finishCtFirstPeriod(_ctAddress);
-    }
+    // function _finishCtFirstPeriod(address _ctAddress)public onlyProxy{
+    //     ctMiddleware.finishCtFirstPeriod(_ctAddress);
+    // }
     
 
 
@@ -358,14 +358,14 @@ contract SutImpl is Ownable{
 
     }
 
-    function _dissolve(address _ctAddress)public onlyProxy{
-        require(sutStore.state(_ctAddress) == 3);
+    // function _dissolve(address _ctAddress)public onlyProxy{
+    //     require(sutStore.state(_ctAddress) == 3);
 
-        ctMiddleware.dissolve(_ctAddress);
+    //     ctMiddleware.dissolve(_ctAddress);
 
-        sutProxy.emitDissolvedCtMarket(_ctAddress);
+    //     sutProxy.emitDissolvedCtMarket(_ctAddress);
 
-    }
+    // }
 
 
     //other function for view 
@@ -438,4 +438,3 @@ contract SutImpl is Ownable{
 
  
 }
-

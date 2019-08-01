@@ -11,44 +11,48 @@
    Gas Price: 10 Gwei
    Fee:0.0402 Ether
 
-4.SutProxy 合约   0xca9728b23745525eb2e455e17a901080eb7422ec
+4.SutProxy 合约   0xed5d967cede8ef16b70e2a4085119dca93c01661
+Value:
+0 Ether ($0.00)
 Transaction Fee:
-0.02699552 Ether ($0.000000)
+0.05008636 Ether ($0.000000)
 Gas Limit:
-2,699,552
+2,504,318
 Gas Used by Transaction:
-2,699,552 (100%)
+2,504,318 (100%)
+Gas Price:
+0.00000002 Ether (20 Gwei)
+
+
+5.CTimpl 合约   0xc630fd668358208b816bf586b9aeebcc8d5400a3
+Value:
+0 Ether ($0.00)
+Transaction Fee:
+0.03207403 Ether ($0.000000)
+Gas Limit:
+3,207,403
+Gas Used by Transaction:
+3,207,403 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
 
-5.CreateCtMarket 合约   0x57bE7b5bE0e00206f8fA90925A78A85c285893cf
+
+6.SutImpl合约    0xa0db198aaddb51d6f463a6f3456a96c6c16aec53
 Transaction Fee:
-0.02560621 Ether ($0.000000)
+0.0564316 Ether ($0.000000)
 Gas Limit:
-2,560,621
+5,643,160
 Gas Used by Transaction:
-2,560,621 (100%)
+5,643,160 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
 
-6.SutImpl合约    0xe93912ae9316dfc2b4f6661e0b8bcf0b8fe5f92a
-Transaction Fee:
-0.05915803 Ether ($0.000000)
-Gas Limit:
-5,915,803
-Gas Used by Transaction:
-5,915,803 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
-
-7.Exchange 合约   0x225bd29c241a3874467ccea4fdc6bc4d3d181e3d
+7.Exchange 合约   0x65235325ef5d62a86a321f4b659e0846ec0569dd
 //0x225bd29c241a3874467ccea4fdc6bc4d3d181e3d
-Transaction Fee:
-0.02516133 Ether ($0.000000)
 Gas Limit:
-2,516,133
+2,870,286
 Gas Used by Transaction:
-2,516,133 (100%)
+2,870,286 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
 
@@ -62,7 +66,13 @@ Gas Price:
 
 ```
 
+#### Exchange 其他地址信息
 
+```
+owner: 0x8b36b88450075bead50f163d7b0e5bcbc9039257
+feeAccount: 0x8b36b88450075bead50f163d7b0e5bcbc9039257
+Admin:[0x8b36b88450075bead50f163d7b0e5bcbc9039257,0xea997cfc8beF47730DFd8716A300bDAB219c1f89]
+```
 
 #### Ropsten 测试网络合约地址信息
 
@@ -235,13 +245,13 @@ address _owner  改变余额的地址
 uint256 _sutRemain  sut余额
 uint256 _ethRemain  eth余额
 
-消耗的gas信息：    //0xc492daed53502717c5adb5b5a3495cc1e09997f1
+消耗的gas信息：    //0x3d37e33c589b3b105f8752239b5298386e04cda3039529654cee303d272a3ad6
 Transaction Fee:
-0.01681122 Ether ($0.000000)
+0.02031344 Ether ($0.000000)
 Gas Limit:
-1,800,000
+2,031,344
 Gas Used by Transaction:
-1,681,122 (98.81%)
+2,031,344 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
 ````

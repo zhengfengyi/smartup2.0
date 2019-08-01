@@ -59,7 +59,7 @@ contract SutProxy is SutProxyConfig{
 
      **********************************************************************************/
     
-    function createMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate) public returns(address _ctAddress){
+    function createMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime) public returns(address _ctAddress){
         require(msg.sender == address(exchange)); 
 
         require(initialDeposit == CREATE_MARKET_DEPOSIT_REQUIRED);
@@ -74,7 +74,7 @@ contract SutProxy is SutProxyConfig{
 
         //require(SUT.transferFrom(marketCreator, sutStoreAddress, initialDeposit), "SUT transfer unsuccessful");
 
-        _ctAddress = sutImpl._newCtMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate, _lastRate);
+        _ctAddress = sutImpl._newCtMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
 
     }
 
@@ -94,23 +94,23 @@ contract SutProxy is SutProxyConfig{
 
      **********************************************************************************/
     
-    function addHolder(address _ctAddress, address _holder)public{
-        require(msg.sender == address(exchange));
+    // function addHolder(address _ctAddress, address _holder)public{
+    //     require(msg.sender == address(exchange));
 
-        sutImpl._addHolder(_ctAddress, _holder);
-    }
+    //     sutImpl._addHolder(_ctAddress, _holder);
+    // }
 
-    function removeHolder(address _ctAddress, address _holder)public{
-        require(msg.sender == address(exchange));
+    // function removeHolder(address _ctAddress, address _holder)public{
+    //     require(msg.sender == address(exchange));
 
-        sutImpl._removeHolder(_ctAddress,_holder);
-    }
+    //     sutImpl._removeHolder(_ctAddress,_holder);
+    // }
 
-    function finishCtFirstPeriod(address _ctAddress)public{
-        require(msg.sender == address(exchange));
+    // function finishCtFirstPeriod(address _ctAddress)public{
+    //     require(msg.sender == address(exchange));
 
-        sutImpl._finishCtFirstPeriod(_ctAddress);
-    }
+    //     sutImpl._finishCtFirstPeriod(_ctAddress);
+    // }
 
 
     /**********************************************************************************
@@ -193,9 +193,9 @@ contract SutProxy is SutProxyConfig{
         sutImpl._prepareDissovle(ctAddress);
     }
 
-    function dissolved(address ctAddress)external {
-        sutImpl._dissolve(ctAddress);
-    }
+    // function dissolved(address ctAddress)external {
+    //     sutImpl._dissolve(ctAddress);
+    // }
 
 
     function emitDissolvedCtMarket(address ctAddress)public onlyImpl{
