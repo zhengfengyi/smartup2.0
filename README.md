@@ -112,7 +112,28 @@ uint256 _amount 存的数量
 uint256 _total   当前余额
 ```
 
-#### 3.用户自己取钱（调用的合约Exchange）
+### 3.存其他ERC20代币
+
+```
+function depositERC20(address _token, uint256 _amount) public
+方法签名：
+
+参数：
+address _token ERC20代币地址
+uint256 _amount 存的代币数量
+
+事件：
+Deposit(address _token, address _owner, uint256 _amount);
+事件签名：
+0xdcbc1c05240f31ff3ad067ef1ee35ce4997762752e3a095284754544f4c709d7
+参数说明：
+address _token  存的代币（sut合约地址如果存的是ETH则为0x0x0000000000000000000000000000000000000000）
+address _owner 存钱的人
+uint256 _amount 存的数量
+uint256 _total   当前余额
+```
+
+#### 4.用户自己取钱（调用的合约Exchange）
 
 ```
 function withdraw(address _token, uint256 _amount)public
@@ -134,8 +155,7 @@ uint256 _reamain 用户余额
 #### 4.管理员帮用户取钱（调用的合约Exchange）
 
 ```
-function adminWithdraw(address _token, uint256 _amount, address payable _owner, uint256 nonce, uint256 feeWithdraw, bytes memory sign)public onlyAdmin
-function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 gasFee, bytes signature) public
+function adminWithdraw(address _token, uint256 _amount, address payable _owner, uint256 nonce, uint256 feeWithdraw, uint256 expires, bytes memory sign)public onlyAdmin
 方法签名：
 0xb34cdd69
 
@@ -145,9 +165,10 @@ uint256 _amount 数量(必须大于10的15次方)
 address payable _owner  取钱的用户地址
 uint256 nonce  用户的nonce值
 uint256 feeWithdraw 取钱的手续费
+uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200）
 bytes memory sign  用户对_token，_amount，_owner，nonce，feeWithdraw的签名
 
-签名的数据: _token, _amount, _owner, nonce, feeWithdraw, sign
+签名的数据: _token, _amount, _owner, nonce, feeWithdraw, expires， sign
 
 事件：
 AdminWithdarw(address _withdrawer, address _token, address _owner, uint256 _value, uint256 _fee, uint256 _remain);
@@ -179,7 +200,7 @@ uint256   用户对应的token余额
 #### 6. 创建市场（调用的合约Exchange）
 
 ````
-function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, bytes memory signature) public onlyAdmin
+function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, uint256 _closingTime, uint256 expires, bytes memory signature) public onlyAdmin
 
 方法签名：0x0d4f1009
 
@@ -192,9 +213,11 @@ uint256 _supply   CT 发行量（1 个 ct 为：1000000000000000000);
 uint256 _rate     第一阶段 CT 兑换 SUT 比例（1 个 ct 能换 0.1 个 sut 则为：10 ** 17）；
 uint256 _lastRate  市场最后的兑换价格(同 _rate)
 uint256 fee  创建市场的费用
+uint256 _closingTime 市场的有效时间（以秒为单位，1 - 90 天时长）
+uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200);
 bytes memory signature 签名
 
-签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, gasFee
+签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, Fee,_closingTime,expires
 
 事件一：
 MarketCreated(address _ctAddress,address _marketCreator,uint256 _initialDeposit);
@@ -228,9 +251,9 @@ Gas Price:
 #### 6.查询Ct市场价格（调用合约CT市场合约）
 
 ```
-uint256 public rate;
+uint256 public exchangeRate;
 方法：
-function rate()public pure returns(uint256)
+function exchangeRate()public pure returns(uint256)
 方法签名：0x2c4e722e
 
 返回值：
@@ -240,9 +263,9 @@ uint256 市场的CT价格
 #### 7. 查询Ct市场最后的卖出价（调用Ct市场合约）
 
 ```
-uint256 public lastRate;
+uint256 public recycleRate;
 方法：
-function lastRate()public pure returns(uint256)
+function recycleRate()public pure returns(uint256)
 方法签名：0x82cac6df
 
 返回值：
@@ -252,11 +275,19 @@ uint256 市场的CT最后的价格
 #### 8.第一阶段购买CT（调用的合约Exchange）
 
 ````
-function buyCt(address _tokenAddress, uint256 _amount)public
+function buyCt(address _tokenAddress, uint256 _amount, address _buyer, uint256 fee, uint256 expires, bytes memory signature)public onlyAdmin
 方法签名：0x841259a1
 参数说明：
 address _tokenAddress  Ct市场地址
 uint256 _amount   ct数量(ct数量必须大于等于 1 个 即 10 ** 18)
+address _buyer  买ct人的地址
+uint256 fee 手续费
+uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200);
+bytes memory signature 签名
+
+签名数据： _tokenAddress,_amount,_buyer，fee, expires
+
+
 
 事件：
 FirstPeriodBuyCt(address _ctAddress, address buyer, uint256 _amount, uint256 _costSut);
