@@ -116,7 +116,7 @@ uint256 _total   当前余额
 
 ```
 function depositERC20(address _token, uint256 _amount) public
-方法签名：
+方法签名：0x97feb926
 
 参数：
 address _token ERC20代币地址
@@ -155,20 +155,19 @@ uint256 _reamain 用户余额
 #### 4.管理员帮用户取钱（调用的合约Exchange）
 
 ```
-function adminWithdraw(address _token, uint256 _amount, address payable _owner, uint256 nonce, uint256 feeWithdraw, uint256 expires, bytes memory sign)public onlyAdmin
+function adminWithdraw(address _token, uint256 _amount, address payable _owner, uint256 feeWithdraw, bytes32 _hash, bytes memory sign)public onlyAdmin
 方法签名：
-0xb34cdd69
+0x04c557a9
 
 参数说明：
 address _token  取钱token地址，若为eth则为（0x0000000000000000000000000000000000000000）
 uint256 _amount 数量(必须大于10的15次方)
 address payable _owner  取钱的用户地址
-uint256 nonce  用户的nonce值
 uint256 feeWithdraw 取钱的手续费
-uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200）
-bytes memory sign  用户对_token，_amount，_owner，nonce，feeWithdraw的签名
+bytes32 签名时时间戳哈希
+bytes memory sign  用户对_token，_amount，_owner，feeWithdraw的签名
 
-签名的数据: _token, _amount, _owner, nonce, feeWithdraw, expires， sign
+签名的数据: _token, _amount, _owner, nonce, feeWithdraw, _hash，
 
 事件：
 AdminWithdarw(address _withdrawer, address _token, address _owner, uint256 _value, uint256 _fee, uint256 _remain);
@@ -200,9 +199,9 @@ uint256   用户对应的token余额
 #### 6. 创建市场（调用的合约Exchange）
 
 ````
-function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, uint256 _closingTime, uint256 expires, bytes memory signature) public onlyAdmin
+function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, uint256 _closingTime, bytes memory signature) public onlyAdmin
 
-方法签名：0x0d4f1009
+方法签名：0x435dbf35
 
 参数说明：
 address marketCreator  市场创建者
@@ -214,10 +213,9 @@ uint256 _rate     第一阶段 CT 兑换 SUT 比例（1 个 ct 能换 0.1 个 su
 uint256 _lastRate  市场最后的兑换价格(同 _rate)
 uint256 fee  创建市场的费用
 uint256 _closingTime 市场的有效时间（以秒为单位，1 - 90 天时长）
-uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200);
 bytes memory signature 签名
 
-签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, Fee,_closingTime,expires
+签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, Fee,_closingTime
 
 事件一：
 MarketCreated(address _ctAddress,address _marketCreator,uint256 _initialDeposit);
@@ -254,7 +252,7 @@ Gas Price:
 uint256 public exchangeRate;
 方法：
 function exchangeRate()public pure returns(uint256)
-方法签名：0x2c4e722e
+方法签名：0x3ba0b9a9
 
 返回值：
 uint256 市场的CT价格
@@ -266,7 +264,7 @@ uint256 市场的CT价格
 uint256 public recycleRate;
 方法：
 function recycleRate()public pure returns(uint256)
-方法签名：0x82cac6df
+方法签名：0xb55795e3
 
 返回值：
 uint256 市场的CT最后的价格
@@ -275,17 +273,17 @@ uint256 市场的CT最后的价格
 #### 8.第一阶段购买CT（调用的合约Exchange）
 
 ````
-function buyCt(address _tokenAddress, uint256 _amount, address _buyer, uint256 fee, uint256 expires, bytes memory signature)public onlyAdmin
-方法签名：0x841259a1
+function buyCt(address _tokenAddress, uint256 _amount, address _buyer, uint256 fee, bytes32 _hash, bytes memory signature)public onlyAdmin
+方法签名：0xc3198905
 参数说明：
 address _tokenAddress  Ct市场地址
 uint256 _amount   ct数量(ct数量必须大于等于 1 个 即 10 ** 18)
 address _buyer  买ct人的地址
 uint256 fee 手续费
-uint256 expires  过期区块高度（可以默认为当前区块 + 100， 例如当前区块高度为 100， 则可设置为 200);
+bytes32 签名时时间戳哈希
 bytes memory signature 签名
 
-签名数据： _tokenAddress,_amount,_buyer，fee, expires
+签名数据： _tokenAddress,_amount,_buyer，fee, _hash
 
 
 
@@ -305,6 +303,7 @@ uint256 _costSut    花费的Sut
 ````
 function sellCt(address _tokenAddress, uint256 _amount)public
 方法签名：
+0x3610f844
 
 参数说明：
 address _tokenAddress  Ct市场地址
