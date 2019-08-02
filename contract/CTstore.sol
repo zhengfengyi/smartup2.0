@@ -1,6 +1,49 @@
 pragma solidity >=0.4.21 <0.6.0;
 
 
+interface ERC20Interface {
+    // METHODS
+
+    // NOTE:
+    //   public getter functions are not currently recognised as an
+    //   implementation of the matching abstract function by the compiler.
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#name
+    function name() external view returns (string memory);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#symbol
+    function symbol() external view returns (string memory);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#totalsupply
+    function decimals() external view returns (uint8);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#totalsupply
+    function totalSupply() external view returns (uint256);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#balanceof
+    function balanceOf(address _owner) external view returns (uint256 balance);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transfer
+    function transfer(address _to, uint256 _value) external returns (bool success);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transferfrom
+    function transferFrom(address _from, address _to, uint256 _value) external returns (bool success);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#approve
+    function approve(address _spender, uint256 _value) external returns (bool success);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#allowance
+    function allowance(address _owner, address _spender) external view returns (uint256 remaining);
+
+    // EVENTS
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transfer-1
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+
+    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#approval
+    event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+}
+
+
 import "./ISmartUp.sol";
 import "./IGradeable.sol";
 import "./Ownable.sol";
@@ -26,8 +69,8 @@ contract CTstore is Ownable{
 
     //uint256 public PAYOUT_VOTING_PERIOD = 3 minutes;
 
-    ISmartIdeaToken public SUT = ISmartIdeaToken(0x7ECF880a6Ba7D17eBBC155118AF4461A15b4E8F7);
-    IGradeable public NTT = IGradeable(0x3440a45b847b14F2e25908c827db36Dee748B0ae);
+    ISmartIdeaToken public SUT = ISmartIdeaToken(0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03);
+    IGradeable public NTT = IGradeable(0x846cE03199A759A183ccCB35146124Cd3F120548);
 
 
     uint8 public decimals = 18;
@@ -62,8 +105,8 @@ contract CTstore is Ownable{
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
-    event Transfer(address from, address to, uint256 amount);
-    event Approve(address _owner, address _spender, uint256 _amount);
+    event Transfer(address indexed _from, address indexed _to, uint256 _value);
+    event Approval(address indexed _owner, address indexed _spender, uint256 _value);
 
     event SetImpl(address _newImplAddress);
 
@@ -123,7 +166,7 @@ contract CTstore is Ownable{
 *                                                                                *
 
 **********************************************************************************/
-    function transfer(address to, uint256 amount) public returns (bool) {
+    function transfer(address to, uint256 amount) public returns (bool success) {
        require(msg.sender == exchange || to == exchange);
        require(amount > 0);
 
@@ -135,27 +178,51 @@ contract CTstore is Ownable{
        return true;
     } 
 
-    function approve(address spender, uint256 value) public  returns (bool) {
+    function approve(address spender, uint256 value) public returns (bool success) {
         require(msg.sender == exchange || spender == exchange);
-        require(value > 0);
 
         allowance[msg.sender][spender] = value;
 
-        emit Approve(msg.sender, spender, value);
+        emit Approval(msg.sender, spender, value);
 
         return true;
     }
 
-    function transferFrom(address from, address spender, uint256 value) public returns (bool success) {
-        require(from == exchange || spender == exchange);
-        require(allowance[from][spender] >= value);
-        require(value > 0);
+    function increaseApproval(address _spender,uint256 _addedValue)public returns (bool) {
+        require(balanceOf[msg.sender] >= allowance[msg.sender][_spender].add(_addedValue));
+
+        allowance[msg.sender][_spender] = allowance[msg.sender][_spender].add(_addedValue);
+
+        emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
+        return true;
+    }
+
+    function decreaseApproval(address _spender,uint256 _subtractedValue)public returns(bool){
+        uint256 oldValue = allowance[msg.sender][_spender];
+        if(_subtractedValue >= oldValue){
+            allowance[msg.sender][_spender] = 0;
+        }else{
+            allowance[msg.sender][_spender] = allowance[msg.sender][_spender].sub(_subtractedValue);
+        }
+
+        emit Approval(msg.sender,_spender,allowance[msg.sender][_spender]);
+
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 value) public returns (bool success) {
+        require(from == exchange || to == exchange);
+        require(balanceOf[from] >= value);
+        require(allowance[from][msg.sender] >= value);
+        require(to != address(0));
 
         balanceOf[from] = balanceOf[from].sub(value);
-        allowance[from][spender] = allowance[from][spender].sub(value);
-        balanceOf[spender] = balanceOf[spender].add(value);
+        balanceOf[to] = balanceOf[to].add(value);
 
-        emit Transfer(from, spender, value);
+        allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
+
+
+        emit Transfer(from, to, value);
 
         return true;
     }

@@ -6,12 +6,12 @@
 1.SUT token合约 （ctConfig 需要设置） 0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03
 2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置） 0x846ce03199a759a183cccb35146124cd3f120548
 
-3.sutStore 合约      0x6b0d0c9442eaf3079fbc9933900e17b1542e97da
+3.sutStore 合约      0x2cc9c3d7e47fe942d23d996e609f0565a306292c
    Gas Limit: 4027415
    Gas Price: 10 Gwei
    Fee:0.0402 Ether
 
-4.SutProxy 合约   0xed5d967cede8ef16b70e2a4085119dca93c01661
+4.SutProxy 合约   0x382f25ae7a3580e425534f1f97bc0e356b2f6cd6
 Value:
 0 Ether ($0.00)
 Transaction Fee:
@@ -24,7 +24,7 @@ Gas Price:
 0.00000002 Ether (20 Gwei)
 
 
-5.CTimpl 合约   0xc630fd668358208b816bf586b9aeebcc8d5400a3
+5.CTimpl 合约   0x1d54e5f8dbae39bfc12258982ea7ab0da16bb2d5
 Value:
 0 Ether ($0.00)
 Transaction Fee:
@@ -37,7 +37,7 @@ Gas Price:
 0.00000001 Ether (10 Gwei)
 
 
-6.SutImpl合约    0xa0db198aaddb51d6f463a6f3456a96c6c16aec53
+6.SutImpl合约    0xcca5926f0ef1d3518eb784bfc993e0be33f69caa
 Transaction Fee:
 0.0564316 Ether ($0.000000)
 Gas Limit:
@@ -46,23 +46,22 @@ Gas Used by Transaction:
 5,643,160 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
-
-7.Exchange 合约   0x65235325ef5d62a86a321f4b659e0846ec0569dd
-//0x225bd29c241a3874467ccea4fdc6bc4d3d181e3d
+7.Exchange 合约   0x5674b8e69c366dc992a2a653966c8ce54402c518
 Gas Limit:
 2,870,286
 Gas Used by Transaction:
 2,870,286 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
-
 8.SutStore 设置sutImplAddress
 
 9.SutProxy 设置sutImplAddress 设置 Exchange地址
 
 10. SutProxy 设置 exchange Address
 
-11.CreateCtMarket 设置 sutImpl地址  exchange地址
+11.CTimpl 设置 sutImpl地址  exchange地址
+
+12.Exchange 设置Admin
 
 ```
 
@@ -102,6 +101,7 @@ address _token  代币合约地址（sut合约地址如果存的是ETH则为0x00
 address _owner 存钱的人
 uint256 _amount 存的数量
 uint256 _total   当前余额；
+
 ```
 
 #### 2.存ETH（调用的合约Exchange）
@@ -150,9 +150,10 @@ function withdraw(address _token, uint256 _amount)public
 方法签名：
 0xf3fef3a3
 参数说明：
+0xed5d967cede8ef16b70e2a4085119dca93c01661
+0xed5d967cede8ef16b70e2a4085119dca93c01661
 address _token  取钱token地址，若为eth则为（0x0000000000000000000000000000000000000000）
 uint256 _amount 数量(必须大于10的15次方)
-
 事件：Withdraw(address _token, address _owner, uint256 _amount, uint256 _reamain);
 address _token  取钱的token，若为eth则为（0x0000000000000000000000000000000000000000）
 address _owner  取钱的人
