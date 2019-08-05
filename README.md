@@ -307,6 +307,14 @@ address _ctAddress  ct市场地址
 address buyer       buyer地址
 uint256 _amount     买的ct数量
 uint256 _costSut    花费的Sut
+
+gas消耗：
+Gas Limit:
+198,056
+Gas Used by Transaction:
+198,056 (100%)
+Gas Price:
+0.00000001 Ether (10 Gwei)
 ````
 
 #### 9.最后卖出CT （调用的合约Exchange）
