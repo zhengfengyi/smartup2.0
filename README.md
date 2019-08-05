@@ -248,12 +248,7 @@ uint256 _ethRemain  eth余额
 
 消耗的gas信息：    //0x3d37e33c589b3b105f8752239b5298386e04cda3039529654cee303d272a3ad6
 Gas Limit:
-2,161,770
-Gas Used by Transaction:
-2,161,770 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
-
+推荐 2,300,000
 ````
 
 #### 6.查询Ct市场价格（调用合约CT市场合约）
@@ -298,22 +293,18 @@ bytes memory signature 签名
 
 
 事件：
-FirstPeriodBuyCt(address _ctAddress, address buyer, uint256 _amount, uint256 _costSut);
+FirstPeriodBuyCt(address _ctAddress, address buyer, uint256 _amount, uint256 _costSut，uint256 fee);
 签名：
-0x9015b5305608921691745c016f5aaf6a460a4d2305f3809cc5b51a184a686440
+0x50e93854cadfd287beac9039b6a35a542b5d0d63737f6e379e0248048a579002
 参数说明：
 address _ctAddress  ct市场地址
 address buyer       buyer地址
 uint256 _amount     买的ct数量
 uint256 _costSut    花费的Sut
 
-gas消耗：
+gas消耗：推荐 320,000
 Gas Limit:
-198,056
-Gas Used by Transaction:
-198,056 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
+推荐 320,000
 ````
 
 #### 9.最后卖出CT （调用的合约Exchange）
