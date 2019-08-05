@@ -247,14 +247,13 @@ uint256 _sutRemain  sut余额
 uint256 _ethRemain  eth余额
 
 消耗的gas信息：    //0x3d37e33c589b3b105f8752239b5298386e04cda3039529654cee303d272a3ad6
-Transaction Fee:
-0.02031344 Ether ($0.000000)
 Gas Limit:
-2,031,344
+2,161,770
 Gas Used by Transaction:
-2,031,344 (100%)
+2,161,770 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
+
 ````
 
 #### 6.查询Ct市场价格（调用合约CT市场合约）
