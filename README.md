@@ -328,5 +328,19 @@ uint256 _amount      卖出ct数量
 uint256 acquireSut   得到的SUT数量
 ````
 
+#### 10.查询市场阶段(调CT市场合约)
+
+```
+bool public isInFirstPeriod;
+
+方法签名：
+0xccf42c3b
+
+返回值：bool 
+true 在第一阶段
+false  不在第一阶段
+
+```
+
 
 
