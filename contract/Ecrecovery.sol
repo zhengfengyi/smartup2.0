@@ -37,4 +37,11 @@ contract Ecrecovery {
   function ecverify(bytes32 hash, bytes memory sig, address signer) public pure returns (bool) {
     return signer == ecrecovery(hash, sig);
   }
+
+  function ecverifyRSV(bytes32 hash, uint8 v, bytes32 r, bytes32 s)public pure returns (address) {
+     bytes memory prefix = "\x19Ethereum Signed Message:\n32";
+     bytes32 hashCode = keccak256(abi.encodePacked(prefix, hash));
+
+     return ecrecover(hashCode, v, r, s);
+  }
 }

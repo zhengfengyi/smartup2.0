@@ -342,5 +342,43 @@ false  不在第一阶段
 
 ```
 
+#### 11.第二阶段交易(调用Exchange 合约)
+
+```
+function trade(uint256[] memory makerValue, address[] memory makerAddress, uint256[4] memory takerValue, address[3] memory takerAddress, bytes32[] memory rs, uint8[] memory v, bytes memory takerSign)public onlyAdmin
+
+方法签名：0xb94140b1
+
+参数说明：
+uint256[] memory makerValue 每三个为一个挂单(maker)的参数makerValue[0] amount（挂单的数量）, makerValue[1] CTprice（价格，若价格为1个SUT 则为1000000000000000000）, makerValue[2] makerTimeStamp（挂单时间）
+
+address[] memory makerAddress 每三个为一个挂单的参数 makerAddress[0] sourceAddress(挂单的币想要卖出的币), makerAddress[1] targetAddress（想要换取得币） makerAddress[2] makerAddress（挂单者自己的地址）
+
+uint256[4] memory takerValue  吃单者的参数 takerValue[0] amount（数量）, takerValue[1] CTprice（价格，若价格为1个SUT 则为1000000000000000000）, takerValue[2]takerTimeStamp（吃单时间） , takerValue[3] takerTransactionFee（手续费）
+
+address[3] memory takerAddress 吃单的地址参数 takerAddress[0]sourceAddress（吃单者想要卖出的币） takerAddress[1] targetAddress（吃单者想要获取的币） takerAddress[2] takerAddress（吃单者自己的地址）
+
+bytes32[] memory rs 每两个参数为一组，对应的是挂单人的 RS 签名
+
+uint8[] memory v  对应挂单人的 v 签名
+
+bytes memory takerSign  吃单者的签名
+
+
+事件：
+Trade(address _sourceAddress, address _targetAddress, address _taker, address _maker, uint256 _targetAmount, uint256 _sourceAmount);
+
+address _sourceAddress   针对吃单人来说的，吃单者想卖出的币
+address _targetAddress   吃单者想买的币
+address _taker           吃单者地址
+address _maker           吃的挂单者地址
+_targetAmount            吃了多少个单，比如吃单者为买CT，则为CT数量
+uint256 _sourceAmount    吃单者卖出的数量，比如吃单者为买CT， 则为SUT数量
+
+事件签名：0x9ae6c84f444be403f63f3a126829553edc7ac75f1e4911cfff892b274a214907
+
+吃一笔单建议gas: 300,000 以此类推
+```
+
 
 
