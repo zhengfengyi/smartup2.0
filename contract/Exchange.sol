@@ -218,20 +218,21 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        emit SellCt(_tokenAddress,msg.sender,_amount,acquireSut);
 
    }
-
+//10000000000000000000000
+//100000000000000000
     //makerValue[0] amount, makerValue[1] CTprice, makerValue[2] makerTimeStamp,
     //makerAddress[0] sourceAddress, makerAddress[1] targetAddress makerAddress[2] makerAddress
     //takerValue[0] amount, takerValue[1] CTprice, takerValue[2]takerTimeStamp , takerValue[3] takerTransactionFee,
     //takerAddress[0]sourceAddress takerAddress[1] targetAddress takerAddress[2] takerAddress 
     //makerSign[0] sign
     //takerSign[0] sign
-    //["5000000000000000000","100000000000000000","1565676685"]
-    //["0x42cd6cbe0a0465b50522c5274d024c745028849a","0x8449b6d5ec1e32f66e2475866981e167fd624a43","0x745C36aC79A4D9A5f4d69CB404AbE0c5Cd3BAff5"]
-    //["4000000000000000000","100000000000000000","1565676686","10000000000000000"]
-    //["0x8449b6d5ec1e32f66e2475866981e167fd624a43","0x42cd6cbe0a0465b50522c5274d024c745028849a","0x8B36B88450075BEad50f163d7b0e5bcbc9039257"]
-    //["0x98c3447c64ed473e2f617d33bc6f93cec3269c965a153b1a1b35019d64728da2","0x2a053bbcba1adf4abdfe2142a38a154761f59dfc3e4a1d0f6b05401733b68288"]
-    //["28"]
-    //"0xfcfc9447bc72a983d8a553e4b36b7e020179c118b9f9cd8044fb5a8239272de20ea0281d1602463940a6f52c23ee886a481282caf829dc7421ff9a3ec25c2d2c1b"
+    //["1000000000000000000000","100000000000000000","1565676685","1000000000000000000000","100000000000000000","1565676685"]
+    //["0x837d9d85d34fa72570b65962d2195dac2b7ad2ea","0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03","0x745C36aC79A4D9A5f4d69CB404AbE0c5Cd3BAff5","0x837d9d85d34fa72570b65962d2195dac2b7ad2ea","0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03","0xea997cfc8beF47730DFd8716A300bDAB219c1f89"]
+    //["1500000000000000000000","100000000000000000","1565676686","1000000000000000"]
+    //["0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03","0x837d9d85d34fa72570b65962d2195dac2b7ad2ea","0x8b36b88450075bead50f163d7b0e5bcbc9039257"]
+    //["0xf4dac695ad3bd70803f26ab0da18317e3f79727662dc73f8709c907e27097dea","0x478a4f5dfc61ca85e1f30a50612f9bf1499dc641e947cefe9b46181d3206c4a1","0xea150221a775266497b291973ca02f81959ec212a49c1bfdf54bc1beb12d5fa3","0x5fd751fbe89cdad23fb95d8952f13c7b2b7d7aab232b7f612060430dba1ff2ac"]
+    //["27","28"]
+    //"0xd7de187e13887f5758356dc57b7dfe661afbd5fd075f94ef7b08f24135074f1635be7dab5819b364dc3e31ef31245c7f4f713e909131932903101831c8f1e7fa1c"
     function trade(uint256[] memory makerValue, address[] memory makerAddress, uint256[4] memory takerValue, address[3] memory takerAddress, bytes32[] memory rs, uint8[] memory v, bytes memory takerSign)public onlyAdmin {
        //check taker sign
        bytes32 takerHash = keccak256(abi.encodePacked(takerValue[0],takerValue[1],takerValue[2],takerValue[3],takerAddress[0],takerAddress[1],takerAddress[2]));
@@ -242,9 +243,10 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        require(takerAddress[0] == address(SUT) || takerAddress[1] == address(SUT));
 
        if(takerAddress[0] == address(SUT)){
-           require(!ctStore(takerAddress[1]).isInFirstPeriod() && !ctStore(takerAddress[1]).dissolved());
+           //TODO !
+           require(ctStore(takerAddress[1]).isInFirstPeriod() && !ctStore(takerAddress[1]).dissolved());
        }else{
-           require(!ctStore(takerAddress[0]).isInFirstPeriod() && !ctStore(takerAddress[0]).dissolved());
+           require(ctStore(takerAddress[0]).isInFirstPeriod() && !ctStore(takerAddress[0]).dissolved());
        }
        
        //order not filled
@@ -271,10 +273,10 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
         //    bytes32 _makerHash =  keccak256(abi.encodePacked(prefix, makerHash));
 
-           require(ecverifyRSV(makerHash, v[i], rs[i.mul(2).add(0)], rs[i.mul(2).add(1)]) == makerAddress[i.mul(3).add(2)]);
+           require(ecverifyRSV(makerHash, v[i], rs[i.mul(2)], rs[i.mul(2).add(1)]) == makerAddress[i.mul(3).add(2)]);
            
            //maker remain
-           uint256 makerRemain = makerValue[i.mul(3)].sub(orderFills[takerHash]);
+           uint256 makerRemain = makerValue[i.mul(3)].sub(orderFills[makerHash]);
 
            require(makerRemain > 0);
 
@@ -342,6 +344,10 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
                }
 
                emit Trade(_source,_target,_taker,_maker,_targetAmount,_sourceAmount);
+   }
+   
+    function destory()public onlyAdmin {
+       selfdestruct(msg.sender);
    }
 
 }
