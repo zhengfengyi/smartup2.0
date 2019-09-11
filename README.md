@@ -46,7 +46,7 @@ Gas Used by Transaction:
 5,643,160 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
-7.Exchange 合约   0x411ac193fead621dd8adde236ff7d7e568cacc87
+7.Exchange 合约   0xb2397c9171CE9AbC209248eEEf29252634Ce8Be5
 Gas Limit:
 2,870,286
 Gas Used by Transaction:
@@ -363,6 +363,8 @@ bytes32[] memory rs 每两个参数为一组，对应的是挂单人的 RS 签�
 uint8[] memory v  对应挂单人的 v 签名
 
 bytes memory takerSign  吃单者的签名
+
+签名的来源：一组rsv 对应的签名为 makerValue 的 amount，CTprice，makerTimeStamp 个 和 makerAddress 的 sourceAddress，targetAddress， makerAddress
 
 
 事件：
