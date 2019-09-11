@@ -46,7 +46,7 @@ Gas Used by Transaction:
 5,643,160 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
-7.Exchange 合约   0xb2397c9171CE9AbC209248eEEf29252634Ce8Be5
+7.Exchange 合约   0xABaed2d6B739cd7B9c54C818300520592344Fd96
 Gas Limit:
 2,870,286
 Gas Used by Transaction:
