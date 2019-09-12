@@ -1,117 +1,92 @@
 pragma solidity >=0.4.21 <0.6.0;
 
+import "./ISmartUp.sol";
+import "./IterableSet.sol";
+import "./SafeMath.sol";
 
-interface ERC20Interface {
-    // METHODS
 
-    // NOTE:
-    //   public getter functions are not currently recognised as an
-    //   implementation of the matching abstract function by the compiler.
+interface GetToken {
+    function ctWithdrawSutToPro(uint256 _value)external;
+    function balanceOf(address _token, address _owner)external view returns(uint256);
+}
 
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#name
-    function name() external view returns (string memory);
+interface MigrationTarget {
+    function migrateFrom(address from, uint256 amount) external;
+}
 
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#symbol
-    function symbol() external view returns (string memory);
+interface Proposal {
+    function marketTokenBalance(address _market, address _token) external view returns(uint256);
+    function marketCurrentReward(address _market, address _token) external view returns(uint256);
+    function withdrawForRecyRate(uint256 amountSut) external;
+}
 
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#totalsupply
-    function decimals() external view returns (uint8);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#totalsupply
-    function totalSupply() external view returns (uint256);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#balanceof
-    function balanceOf(address _owner) external view returns (uint256 balance);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transfer
-    function transfer(address _to, uint256 _value) external returns (bool success);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transferfrom
-    function transferFrom(address _from, address _to, uint256 _value) external returns (bool success);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#approve
-    function approve(address _spender, uint256 _value) external returns (bool success);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#allowance
-    function allowance(address _owner, address _spender) external view returns (uint256 remaining);
-
-    // EVENTS
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#transfer-1
-    event Transfer(address indexed _from, address indexed _to, uint256 _value);
-
-    // https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md#approval
-    event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+interface ISmartIdeaToken {
+    function approveAndCall(address spender, uint256 value, bytes calldata extraData) external returns (bool);
 }
 
 
-import "./ISmartUp.sol";
-import "./IGradeable.sol";
-import "./Ownable.sol";
-import "./IterableSet.sol";
-import "./ISmartIdeaToken.sol";
-import "./SafeMath.sol";
 
-contract CTstore is Ownable{
+contract CTstore {
     using IterableSet for IterableSet.AddressSet;
     using SafeMath for uint256;
-
-    enum Vote {
-        Abstain, Aye, Nay
-    }
-
-    uint8 public MINIMUM_BALLOTS = 1; 
-
-    uint256 public JUROR_COUNT = 3;
-
-    //uint256 constant ONE_CT = 10 ** 18;
-
-    //uint256 constant MINEXCHANGE_CT = 10 ** 16;
-
-    //uint256 public PAYOUT_VOTING_PERIOD = 3 minutes;
-
-    ISmartIdeaToken public SUT = ISmartIdeaToken(0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03);
-    IGradeable public NTT = IGradeable(0x846cE03199A759A183ccCB35146124Cd3F120548);
-
 
     uint8 public decimals = 18;
 
     string public name;
     string public symbol;
     
-
+    // address public SUT = ;
     address public exchange;
     address public creator;
-    address public exStore;
     address public ctImpl;
+    address public proposal;
+    address public SUT = address(0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03);
+
+    // Target contract
+    address public migrationTarget = address(0);
+    address public migrationFrom = address(0);
+    uint256 public totalMigrated;
+
     
     bool public dissolved;
     bool public isRecycleOpen = true;
     bool public isInFirstPeriod;
+    
+    uint8 public upgradeState; //normal, prepareUpgrade, upGradeing, finishedUpgrade;
+
+    // bool public isWithdraw;
     
     uint256 public totalSupply;
     uint256 public exchangeRate;
     uint256 public recycleRate;
     uint256 public createTime;
     uint256 public closingTime;
+    uint256 constant DECIMALS_RATE = 10 ** 18;
 
-    IterableSet.AddressSet private jurors; 
+    uint256 public reRecycleRate;
+    uint256 public recycleStart;
+    uint256 public recyclePeriod = 10 minutes;
+
     IterableSet.AddressSet private tokenHolders;
+    // IterableSet.AddressSet private recivedToken;
+    IterableSet.AddressSet private admin;
+    IterableSet.AddressSet private adminVote;
 
-    uint8[] private jurorsVote;
-
-    ISmartUp private smartup; 
-
+    ISmartUp private smartup;
 
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => mapping(address => uint256)) public honorDonation;
 
+    
+    
     event Transfer(address indexed _from, address indexed _to, uint256 _value);
     event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+    event StartMigration(address _target);
+    event WithdrawToken(address _token, uint256 _value);
 
-    event SetImpl(address _newImplAddress);
 
-
-    constructor(address _owner, address _creator, address _ctImpl, address _smartupStore, address _exchange, string memory _name, string memory _symbol, uint256 _totalSupply, uint256 _exchangeRate, uint256 _recycleRate, uint256 _closingTime)public Ownable(_owner){
+    constructor(address _creator, address _ctImpl, address _smartupStore, address _exchange, string memory _name, string memory _symbol, uint256 _totalSupply, uint256 _exchangeRate, uint256 _recycleRate, uint256 _closingTime, address _proposal)public {
         creator = _creator;
         ctImpl = _ctImpl;
         exchange = _exchange;
@@ -123,40 +98,131 @@ contract CTstore is Ownable{
         smartup = ISmartUp(_smartupStore);
         createTime = now;
         closingTime = _closingTime;
-        isInFirstPeriod = true;
         balanceOf[_exchange] = _totalSupply;
+
+        if (_totalSupply != 0) {
+            isInFirstPeriod = true;
+        }
+
+        admin.add(_creator);
+        proposal = _proposal;
     }
 
     modifier onlyImpl(){
         require(msg.sender == ctImpl);
         _;
     }
-    
-    // set Config
-    // function setMinBallots(uint8 _ballots)public onlyOwner {
-    //     MINIMUM_BALLOTS = _ballots;
-    // }
 
-    // function setJurorCount(uint256 _count)public onlyOwner{
-    //     JUROR_COUNT = _count;
-    // }
+/**********************************************************************************
 
-    // function setPayoutPeriod(uint256 _time)public onlyOwner{
-    //     PAYOUT_VOTING_PERIOD = _time * 60;
-    // }
+*                                                                                *
 
-    // function setSut(address _sut)public onlyOwner{
-    //     SUT = ISmartIdeaToken(_sut);
-    // }
+* upgrade,  recycle, creator
+  newMarket, setMigrratefFrom, setMigration, migragtion;                                                      *
 
-    // function setNtt(address _ntt)public onlyOwner{
-    //     NTT = IGradeable(_ntt);
-    // }
+*                                                                                *
 
-    function setImpl(address _impl) public onlyImpl{
-        ctImpl = _impl;
-        emit SetImpl(_impl);
+**********************************************************************************/   
+    modifier whenMigrationUnstarted() {
+        require(migrationTarget == address(0));
+        _;
     }
+
+    /**
+     * @dev modifier to allow actions only when the migration is not started
+     */
+    modifier whenMigrating() {
+        require(migrationTarget != address(0) && totalMigrated < tokenHolders.size());
+        _;
+    }
+
+    /**
+     * @dev called by the owner to start migration, triggers stopped state
+     * @param target The address of the MigrationTarget contract
+     * 
+     * TODO: maybe we should add logic to make sure target is correct, like checking whether it's a contract
+     * 
+     */
+
+
+    function startMigration(address target) external whenMigrationUnstarted onlyImpl{
+        require(target != address(0));
+        require(target != address(this));
+
+        migrationTarget = target;
+        // make sure token holders list won't be updated during migration
+        tokenHolders.freeze();
+        emit StartMigration(target);
+    }
+
+    function migrate(uint256 batchSize) whenMigrating external {
+
+        uint256 lastPos = totalMigrated.add(batchSize) < tokenHolders.size() ? totalMigrated.add(batchSize) : tokenHolders.size();
+
+        for (uint256 i = totalMigrated; i < lastPos; ++i) {
+            address tokenHolder = tokenHolders.at(i);
+            // ignore empty balance
+            if (balanceOf[tokenHolder] > 0) {
+                uint256 amount = balanceOf[tokenHolder].add(GetToken(exchange).balanceOf(address(this),tokenHolder));
+                // finalizeMigration may or may not clear the balance of the token holder 
+              //finalizeMigration(tokenHolder, amount);
+
+                totalMigrated = i.add(1);
+                MigrationTarget(migrationTarget).migrateFrom(tokenHolder, amount);
+
+            }
+        }
+    }
+  
+    function setMigrateFrom(address _from) external onlyImpl{
+        require(_from != address(0) && _from != address(this));
+        require(totalSupply == 0 && isInFirstPeriod == false);
+        migrationFrom = _from;
+    }
+
+    function migrateFrom(address _holder, uint256 value) external {
+        require(msg.sender == migrationFrom);
+
+        balanceOf[_holder] = value;
+
+        totalSupply = totalSupply.add(value);
+    }
+
+    function finishMigration() whenMigrating external {
+        require(totalMigrated == tokenHolders.size());
+
+        tokenHolders.unfreeze();
+    }
+
+/**********************************************************************************
+
+*                                                                                *
+
+* admin   operation                                                            *
+
+*                                                                                *
+
+**********************************************************************************/
+    function _addAdmin(address _newAdmin) public onlyImpl{
+        admin.add(_newAdmin);
+    }
+
+    function _deleteAdmin(address _admin) public onlyImpl{
+        admin.remove(_admin);
+    }
+
+    function isAdmin(address _admin) public view returns (bool){
+        return admin.contains(_admin);
+    }
+
+    function adminList() public view returns (address[] memory) {
+        return admin.list();
+    }
+
+    function adminSize() public view returns (uint256) {
+        return admin.size();
+    }
+
 /**********************************************************************************
 
 *                                                                                *
@@ -166,19 +232,19 @@ contract CTstore is Ownable{
 *                                                                                *
 
 **********************************************************************************/
-    function transfer(address to, uint256 amount) public returns (bool success) {
-       require(msg.sender == exchange || to == exchange);
-       require(amount > 0);
+    function transfer(address to, uint256 amount) public whenMigrationUnstarted returns (bool success) {
+      require(msg.sender == exchange || to == exchange);
+      require(amount > 0);
 
-       balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
-       balanceOf[to] = balanceOf[to].add(amount);
+      balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
+      balanceOf[to] = balanceOf[to].add(amount);
 
-       emit Transfer(msg.sender,to,amount);
+      emit Transfer(msg.sender,to,amount);
 
-       return true;
+      return true;
     } 
 
-    function approve(address spender, uint256 value) public returns (bool success) {
+    function approve(address spender, uint256 value) public whenMigrationUnstarted returns (bool success) {
         require(msg.sender == exchange || spender == exchange);
 
         allowance[msg.sender][spender] = value;
@@ -188,29 +254,7 @@ contract CTstore is Ownable{
         return true;
     }
 
-    function increaseApproval(address _spender,uint256 _addedValue)public returns (bool) {
-        require(balanceOf[msg.sender] >= allowance[msg.sender][_spender].add(_addedValue));
-
-        allowance[msg.sender][_spender] = allowance[msg.sender][_spender].add(_addedValue);
-
-        emit Approval(msg.sender, _spender, allowance[msg.sender][_spender]);
-        return true;
-    }
-
-    function decreaseApproval(address _spender,uint256 _subtractedValue)public returns(bool){
-        uint256 oldValue = allowance[msg.sender][_spender];
-        if(_subtractedValue >= oldValue){
-            allowance[msg.sender][_spender] = 0;
-        }else{
-            allowance[msg.sender][_spender] = allowance[msg.sender][_spender].sub(_subtractedValue);
-        }
-
-        emit Approval(msg.sender,_spender,allowance[msg.sender][_spender]);
-
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 value) public returns (bool success) {
+    function transferFrom(address from, address to, uint256 value) public whenMigrationUnstarted returns (bool success) {
         require(from == exchange || to == exchange);
         require(balanceOf[from] >= value);
         require(allowance[from][msg.sender] >= value);
@@ -221,12 +265,10 @@ contract CTstore is Ownable{
 
         allowance[from][msg.sender] = allowance[from][msg.sender].sub(value);
 
-
         emit Transfer(from, to, value);
 
         return true;
     }
-
 
 /**********************************************************************************
 
@@ -248,45 +290,6 @@ contract CTstore is Ownable{
     function setFirstPeriod(bool _isFirstPeriod)public onlyImpl {
         isInFirstPeriod = _isFirstPeriod;
     }
-
-
-/**********************************************************************************
-
-*                                                                                *
-
-* jurors operation                                                                *
-
-*                                                                                *
-
-**********************************************************************************/
-    function addJurors(address _jurors)public onlyImpl {
-        jurors.add(_jurors);
-    }
-
-    function removeJurors(address _jurors)public onlyImpl {
-        jurors.remove(_jurors);
-    }
-    
-    function listJurors()public view onlyImpl returns(address[] memory) {
-        return jurors.list();
-    }
-
-    function destroyJurors()public onlyImpl {
-        jurors.destroy();
-    }
-
-    function containsJurors(address _jurors)public onlyImpl view returns(bool){
-        return jurors.contains(_jurors);
-    }
-
-    function positionJurors(address _jurors)public onlyImpl view returns(uint256){
-        return jurors.position(_jurors);
-    }
-
-    function sizeJurors()public onlyImpl view returns(uint256){
-        return jurors.size();
-    }
-
 /**********************************************************************************
 
 *                                                                                *
@@ -304,7 +307,7 @@ contract CTstore is Ownable{
         tokenHolders.remove(_holder);
     }
     
-    function listHolder()public view onlyImpl returns(address[] memory) {
+    function listHolder()public view  returns(address[] memory) {
         return tokenHolders.list();
     }
 
@@ -312,39 +315,17 @@ contract CTstore is Ownable{
         tokenHolders.destroy();
     }
 
-    function containsHolder(address _holder)public onlyImpl view returns(bool){
+    function containsHolder(address _holder)public view returns(bool){
         return tokenHolders.contains(_holder);
     }
 
-    function positionHolder(address _holder)public onlyImpl view returns(uint256){
+    function positionHolder(address _holder)public view returns(uint256){
         return tokenHolders.position(_holder);
     }
 
-    function sizeHolder()public onlyImpl view returns(uint256){
+    function sizeHolder()public view returns(uint256){
         return tokenHolders.size();
     }
-
-/**********************************************************************************
-
-*                                                                                *
-
-* jurorsVote operation                                                         *
-
-*                                                                                *
-
-**********************************************************************************/
-    function pushVote(uint8 yeah)public onlyImpl {
-        jurorsVote.push(yeah);
-    }
-
-    function destroyVote()public onlyImpl {
-        delete jurorsVote;
-    }
-
-    function listJurorsVote()public onlyImpl view returns(uint8[] memory) {
-        return jurorsVote;
-    }
-
 /**********************************************************************************
 
 *                                                                                *
@@ -358,6 +339,146 @@ contract CTstore is Ownable{
         smartup.addMember(_member);
     }
 
+/**********************************************************************************
 
-    
+*                                                                                *
+
+* smartUp addMember                                                              *
+
+*                                                                                *
+
+**********************************************************************************/
+    // function withdrawSut() public {
+    //    require(!isInFirstPeriod);
+    //    require(!isWithdraw);
+
+    //    uint256 amount = totalSupply.mul(exchangeRate).div(10 ** 18) - totalSupply.mul(recycleRate).div(10 ** 18);
+
+    //    GetToken(exchange).withdraw(address(SUT), amount);
+
+    //    ERC20Interface(SUT).approve(proposal, amount);
+
+    //    emit WithdrawToken(SUT, amount);
+    // }
+
+/**********************************************************************************
+
+*                                                                                 *
+
+* change recyclePrice                                                             *
+
+*                                                                                *
+
+**********************************************************************************/
+   function requestRecycleChange(uint256 _recycle) public {
+       require(isAdmin(msg.sender));       
+       require(!dissolved);
+       require(migrationTarget == address(0));
+       require(reRecycleRate == 0);
+       require(_recycle != recycleRate);
+       
+
+       uint256 maxRecycleRate = getMaxRecycleRate();
+
+       require(_recycle > 0 && _recycle < maxRecycleRate);
+       
+       recycleStart = now;
+       reRecycleRate = _recycle;
+       adminVote.add(msg.sender);
+
+       if (adminVote.size() > adminSize().div(uint256(2))) {
+           requestRecycleSuccess();
+       }
+   }
+
+   function getMaxRecycleRate() public view returns(uint256) {
+        uint256 amountSut = GetToken(exchange).balanceOf(SUT,address(this)).add(Proposal(proposal).marketTokenBalance(address(this),SUT).sub(Proposal(proposal).marketCurrentReward(address(this),SUT)));
+        
+        uint256 maxRecycleRate = amountSut.mul(10 ** 18).div(totalSupply);
+
+        return maxRecycleRate;
+
+   }
+
+   function voteForRecycleRate() public {
+       require(isAdmin(msg.sender));
+       require(!adminVote.contains(msg.sender));
+       require(now.sub(recycleStart) < recyclePeriod);
+
+       adminVote.add(msg.sender);
+
+       if (adminVote.size() > adminSize().div(uint256(2))) {
+           requestRecycleSuccess();
+       }
+   }
+
+   function requestRecycleSuccess() private {
+
+      if (reRecycleRate > recycleRate) {
+          uint256 transferSut = totalSupply.mul(reRecycleRate.sub(recycleRate)).div(DECIMALS_RATE);
+
+          Proposal(proposal).withdrawForRecyRate(transferSut);
+
+      }else {
+
+          uint256 withdrawSut = totalSupply.mul(recycleRate.sub(reRecycleRate)).div(DECIMALS_RATE);
+
+          GetToken(exchange).ctWithdrawSutToPro(withdrawSut);
+      }
+
+   }
+
+   function conclusionRecycle() public {
+      require(reRecycleRate != 0);
+      
+      require(now.sub(recycleStart) > recyclePeriod);
+
+      if(adminVote.size() > adminSize().div(uint256(2))) {
+        if (reRecycleRate > recycleRate) {
+          uint256 transferSut = totalSupply.mul(reRecycleRate.sub(recycleRate)).div(DECIMALS_RATE);
+
+          ISmartIdeaToken(SUT).approveAndCall(exchange, transferSut, toBytes(address(this)));
+
+      }else{
+
+          uint256 withdrawSut = totalSupply.mul(recycleRate.sub(reRecycleRate)).div(DECIMALS_RATE);
+
+          ISmartIdeaToken(SUT).approveAndCall(proposal, withdrawSut, toBytes(address(this)));
+
+      }
+
+      }
+
+       adminVote.destroy();
+
+       recycleRate = reRecycleRate;
+
+       reRecycleRate = 0;
+
+       recycleStart = 0;
+   }
+
+  function removeRequestRecycle() public {
+      require(reRecycleRate != 0);
+      require(now.sub(recycleStart) > recyclePeriod);
+      require(adminVote.size() <= admin.size().div(2));
+
+        adminVote.destroy();
+
+        reRecycleRate = 0;
+
+        recycleStart = 0;
+  }  
+
+  function toBytes(address a) internal pure returns (bytes memory b){
+    assembly {
+        let m := mload(0x40)
+        a := and(a, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        mstore(add(m, 20), xor(0x140000000000000000000000000000000000000000, a))
+        mstore(0x40, add(m, 52))
+        b := m
+  }
 }
+
+}
+

@@ -67,10 +67,8 @@ contract SutProxy is SutProxyConfig{
         require(exchange.balanceOf(address(SUT), marketCreator) >= initialDeposit);
 
         require(NTT.isAllow(marketCreator, CREATE_MARKET_NTT_KEY), "Not enough NTT");
-
-        require(_supply > 0);
         
-        require(_rate > 0 && _lastRate > 0);
+        require(_rate > 0 && _lastRate > 0 && _rate > _lastRate);
 
         //require(SUT.transferFrom(marketCreator, sutStoreAddress, initialDeposit), "SUT transfer unsuccessful");
 

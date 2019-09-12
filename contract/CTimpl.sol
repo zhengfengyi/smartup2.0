@@ -1,7 +1,6 @@
 pragma solidity >=0.4.21 <0.6.0;
 
 import "./Ownable.sol";
-import "./IterableSet.sol";
 import "./CTstore.sol";
 
 contract CTimpl is Ownable {
@@ -11,12 +10,12 @@ contract CTimpl is Ownable {
     address public sutImpl;
     address public exStore;
     address public sutStore;
+    address public proAddress;
 
 
-    constructor (address _sutImpl, address _owner, address _exStore, address _sutStore)public Ownable(_owner){
-        sutImpl = _sutImpl;
-        exStore = _exStore;
+    constructor (address _owner, address _sutStore, address _proposal)public Ownable(_owner){
         sutStore = _sutStore;
+        proAddress = _proposal;
     }
 
     modifier onlySutImpl(){
@@ -37,10 +36,13 @@ contract CTimpl is Ownable {
         exStore = _exchange;
     }
 
+    function setProposal(address _proposal) public onlyOwner {
+        proAddress = _proposal;
+    }
 
-    function newCtMarket(address owner, address creator, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime)external onlySutImpl returns(address ctAddress){
+    function newCtMarket(address creator, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime)external onlySutImpl returns(address ctAddress){
 
-        CTstore ct = new CTstore(owner, creator, address(this), sutStore, exStore, _name,_symbol,_supply,_rate, _lastRate, _closingTime);
+        CTstore ct = new CTstore(creator, address(this), sutStore, exStore, _name, _symbol, _supply, _rate, _lastRate, _closingTime, proAddress);
 
         ctAddress = address(ct);
     }
@@ -48,21 +50,6 @@ contract CTimpl is Ownable {
 
     function addCt(address _ctAddress)public onlySutImpl {
         cts.add(_ctAddress);
-    }
-
-    function setCtStoreImpl(address ctAddress, address impl)public onlyOwner {
-        CTstore ctstore = CTstore(ctAddress);
-
-        ctstore.setImpl(impl);
-
-    }
-
-    function changeAllctImpl(address impl)public onlyOwner {
-        address[] memory ctMarkets = cts.list();
-
-        for(uint256 i = 0; i < ctMarkets.length; i++){
-            CTstore(ctMarkets[i]).setImpl(impl);
-        }
     }
 
     function buyct(address _ctAddress, address _holder)public onlyExchange {
@@ -79,11 +66,26 @@ contract CTimpl is Ownable {
         CTstore(_ctAddress).setFirstPeriod(false);
     }
 
+    function addAdmin(address _ctAddress, address _buyer) public onlyExchange {
+        CTstore(_ctAddress)._addAdmin(_buyer);
+        
+    }
+
+    function deleteAdmin(address _ctAddress, address _seller) public onlyExchange {
+        CTstore(_ctAddress)._deleteAdmin(_seller);
+    }
+
     function trunDissolved(address _ctAddress)public onlySutImpl {
         CTstore(_ctAddress).setDissvoled(true);
     }
 
+    function setUpgradeMarket(address _ctAddress, address _newAddress) public onlyExchange {
+        CTstore(_ctAddress).startMigration(_newAddress);
+    }
 
-    
+    function setCtMigrateFrom(address _ctAddress, address _from) public onlyExchange {
+        CTstore(_ctAddress).setMigrateFrom(_from);
+
+    }
 
 }

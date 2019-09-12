@@ -3,15 +3,15 @@
 #### 合约步骤
 
 ```
-1.SUT token合约 （ctConfig 需要设置） 0xf1899c6eb6940021c1ae4e9c3a8e29ee93704b03
-2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置） 0x846ce03199a759a183cccb35146124cd3f120548
+1.SUT token合约 （ctConfig 需要设置） 0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03
+2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置） 0x846cE03199A759A183ccCB35146124Cd3F120548
 
-3.sutStore 合约      0x2cc9c3d7e47fe942d23d996e609f0565a306292c
+3.sutStore 合约      0xbEa30a20693cf6470d57C7FB396F79531D0FF1D3
    Gas Limit: 4027415
    Gas Price: 10 Gwei
    Fee:0.0402 Ether
 
-4.SutProxy 合约   0x382f25ae7a3580e425534f1f97bc0e356b2f6cd6
+4.SutProxy 合约   0xcE03Adb6c9Cd167039417b0CBFA421349b2d8C22
 Value:
 0 Ether ($0.00)
 Transaction Fee:
@@ -23,8 +23,9 @@ Gas Used by Transaction:
 Gas Price:
 0.00000002 Ether (20 Gwei)
 
+CtProposal(需要设置Exchange 地址) 0xc6Ab19f4adB704e729334695D3FbfCBc86d1039A
 
-5.CTimpl 合约   0x1d54e5f8dbae39bfc12258982ea7ab0da16bb2d5
+5.CTimpl 合约   0x6B907D4Dd3F63e1123FAE2c6572Ca6F48a6C5D83
 Value:
 0 Ether ($0.00)
 Transaction Fee:
@@ -37,7 +38,7 @@ Gas Price:
 0.00000001 Ether (10 Gwei)
 
 
-6.SutImpl合约    0xcca5926f0ef1d3518eb784bfc993e0be33f69caa
+6.SutImpl合约    0xB2e1DEAE6f7E0DE18Fc7d90eE2dA5a2d98526891
 Transaction Fee:
 0.0564316 Ether ($0.000000)
 Gas Limit:
@@ -46,7 +47,7 @@ Gas Used by Transaction:
 5,643,160 (100%)
 Gas Price:
 0.00000001 Ether (10 Gwei)
-7.Exchange 合约   0xABaed2d6B739cd7B9c54C818300520592344Fd96
+7.Exchange 合约   0xD6f5F5029cAB6BE693Dd1e477A6cca3A07CaF03C
 Gas Limit:
 2,870,286
 Gas Used by Transaction:

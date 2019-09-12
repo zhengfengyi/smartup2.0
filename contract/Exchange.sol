@@ -1,21 +1,33 @@
 pragma solidity >=0.4.21 <0.6.0;
 
-import "./Ownable.sol";
+
 import "./SafeMath.sol";
 import "./ExchangeConfig.sol";
 import "./Ecrecovery.sol";
+import "./Address.sol";
 
 interface ctStore {
+    
     function isInFirstPeriod()external view returns(bool);
     function exchangeRate()external pure returns(uint256); 
     function recycleRate()external pure returns(uint256);
     function dissolved()external pure returns(bool);
     function isRecycleOpen()external pure returns(bool);
-
+    function isAdmin(address _admin) external pure returns(bool);
+    function adminSize() external pure returns(uint256);
+    function totalSupply() external pure returns(uint256);
+    function creator() external pure returns(address);
+    function migrationTarget() external pure returns(address);
+    function migrationFrom()external pure returns(address);
  }
 
-contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
+interface ISmartIdeaToken {
+    function approveAndCall(address spender, uint256 value, bytes calldata extraData) external returns (bool);
+}
+
+contract Exchange is ExchangeConfig, Ecrecovery{
     using SafeMath for uint256;
+    using Address for address;
     
     mapping (address => mapping(address => uint256)) public tokenBalance;
     mapping (address => bool)private isAllowed;
@@ -34,7 +46,7 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
 
 
-    constructor(address _sut, address _fee, address _sutProxy, address _ctImpl)public Ownable(msg.sender) ExchangeConfig(_sut,_fee, _sutProxy,_ctImpl){
+    constructor(address _sut, address _fee, address _sutStore, address _sutProxy, address _ctImpl, address _proposal)public ExchangeConfig(_sut,_sutStore, _fee, _sutProxy,_ctImpl,_proposal, msg.sender){
         
     }
     
@@ -47,8 +59,32 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
         require(token == address(SUT));
         require(approvedSutAmount >= MIN_VALUE);
 
-        depositSut(sutOwner, approvedSutAmount, token);
+        address toAddress = bytesToAddress(extraData);
+
+        if (sutOwner.isContract() && toAddress != address(0)) {
+            depositSut(toAddress, approvedSutAmount, token);
+        }else{
+            depositSut(sutOwner, approvedSutAmount, token);
+        }
+
     }
+
+    function toBytes(address a) internal pure returns (bytes memory b){
+    assembly {
+        let m := mload(0x40)
+        a := and(a, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        mstore(add(m, 20), xor(0x140000000000000000000000000000000000000000, a))
+        mstore(0x40, add(m, 52))
+        b := m
+    }
+}
+
+    function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
+    assembly {
+      addr := mload(add(bys,20))
+    } 
+   }
+
 
     function depositERC20(address _token, uint256 _amount) public {
         require(_token != address(0));
@@ -91,6 +127,12 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
         emit Withdraw(_token, msg.sender, _amount, tokenBalance[_token][msg.sender]);
     }
+
+    // //internal transfer
+    // function internalTransfer(address _to, address _token, uint256 _value) public {
+    //     require(_to != address(0));
+    //     require(_token != add)
+    // }
     
 
     //admin withdarw
@@ -125,9 +167,18 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
         emit AdminWithdarw(msg.sender, _token, _owner, _amount, feeWithdraw, tokenBalance[_token][_owner]);
     }
 
+    function ctWithdrawSutToPro(uint256 _value) external {
+        require(tokenBalance[address(SUT)][msg.sender] >= _value);
+        require(SutStore(sutStore).creator(msg.sender) != address(0));
+
+        Token(address(SUT)).transfer(msg.sender, _value);
+        
+        tokenBalance[address(SUT)][msg.sender] = tokenBalance[address(SUT)][msg.sender].sub(_value);
+    }
+
 
     function balanceOf(address _token, address _owner)public view returns (uint256 _amount) {
-        return tokenBalance[_token][_owner];   
+        return tokenBalance[_token][_owner];
     }
 
 
@@ -148,23 +199,25 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
 
         address _tokenAddress = sutProxy.createMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate,_lastRate,_closingTime);
         
+        SUT.transfer(sutStore, initialDeposit);
+        
         tokenBalance[address(SUT)][_creator] = tokenBalance[address(SUT)][_creator].sub(initialDeposit);
-        tokenBalance[(address(SUT))][_tokenAddress] = tokenBalance[(address(SUT))][_tokenAddress].add(initialDeposit);
+
+        //tokenBalance[(address(SUT))][_tokenAddress] = tokenBalance[(address(SUT))][_tokenAddress].add(initialDeposit);
         tokenBalance[_tokenAddress][_tokenAddress] = _supply;
 
         expireHash[signHash] = true;
 
-        emit BalanceChange(marketCreator,tokenBalance[address(SUT)][_creator],tokenBalance[address(0)][_creator]);       
+        emit BalanceChange(marketCreator,tokenBalance[address(SUT)][_creator],tokenBalance[address(0)][_creator]);
    }
 
 
    function buyCt(address _tokenAddress, uint256 _amount, address _buyer, uint256 fee, bytes32 _hash, bytes memory signature)public onlyAdmin{
 
-       bytes32 signHash = keccak256(abi.encodePacked(_tokenAddress, _amount, _buyer, fee, _hash));
+       bytes32 signHash = keccak256(abi.encodePacked(_tokenAddress, _amount, _buyer, fee, _hash)); 
 
-       address buyer = ecrecovery(signHash, signature);
-
-       require(buyer == _buyer);
+       require(ecrecovery(signHash, signature) == _buyer);
+       
        require(!expireHash[signHash]);
        
        require(_amount >= MIN_VALUE);
@@ -173,33 +226,56 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        require(tokenBalance[_tokenAddress][_tokenAddress] >= _amount);
 
        uint256 costSut = _amount.mul(market.exchangeRate()).div(DECIMALS_RATE);
-       require(tokenBalance[address(SUT)][buyer] >= costSut);
+       require(tokenBalance[address(SUT)][_buyer] >= costSut);
 
        tokenBalance[_tokenAddress][_tokenAddress] = tokenBalance[_tokenAddress][_tokenAddress].sub(_amount);
-       tokenBalance[_tokenAddress][buyer] = tokenBalance[_tokenAddress][buyer].add(_amount);
+       tokenBalance[_tokenAddress][_buyer] = tokenBalance[_tokenAddress][_buyer].add(_amount);
 
        tokenBalance[address(SUT)][_tokenAddress] = tokenBalance[address(SUT)][_tokenAddress].add(costSut);
-       tokenBalance[address(SUT)][buyer] = tokenBalance[address(SUT)][buyer].sub(costSut);
+       tokenBalance[address(SUT)][_buyer] = tokenBalance[address(SUT)][_buyer].sub(costSut);
 
-       tokenBalance[address(0)][buyer] = tokenBalance[address(0)][buyer].sub(fee);
+       tokenBalance[address(0)][_buyer] = tokenBalance[address(0)][_buyer].sub(fee);
        tokenBalance[address(0)][feeAccount] = tokenBalance[address(0)][feeAccount].add(fee);
        
        ctImpl.buyct(_tokenAddress, _buyer);
+       
+       marketAdminCheck(_tokenAddress, _buyer);
 
        if (tokenBalance[_tokenAddress][_tokenAddress] == 0) {
+           
            ctImpl.finishFirstPeriod(_tokenAddress);
+
+           uint256 toProposal = tokenBalance[address(SUT)][_tokenAddress].mul(market.exchangeRate().sub(market.recycleRate())).div(DECIMALS_RATE);
+
+           require(ISmartIdeaToken(address(SUT)).approveAndCall(proposal, toProposal,toBytes(_tokenAddress)));
+           
+           tokenBalance[address(SUT)][_tokenAddress] = tokenBalance[address(SUT)][_tokenAddress].sub(toProposal);
        }
 
        expireHash[signHash] = true;
        
-       emit FirstPeriodBuyCt(_tokenAddress, buyer, _amount, costSut, fee);
+       emit FirstPeriodBuyCt(_tokenAddress, _buyer, _amount, costSut, fee);
+
+   }
+   
+
+
+   function marketAdminCheck(address _ctAddress, address trader) internal {
+       ctStore ct = ctStore(_ctAddress);
+
+       if (tokenBalance[_ctAddress][trader] >= ct.totalSupply().div(10) && !ct.isAdmin(trader) && ct.adminSize() < 5 && trader != ct.creator()) {
+           ctImpl.addAdmin(_ctAddress, trader);
+       }else if(ct.isAdmin(trader) && ct.adminSize() >= 0 && tokenBalance[_ctAddress][trader] < ct.totalSupply().div(10) && trader != ct.creator()) {
+           ctImpl.deleteAdmin(_ctAddress, trader);
+       }
 
    }
 
    function sellCt(address _tokenAddress, uint256 _amount)public{
        require(_amount >= MIN_VALUE);
        ctStore market = ctStore(_tokenAddress);
-
+       
+       require(market.migrationTarget() == address(0));
        require(market.isRecycleOpen());
 
        uint256 acquireSut = _amount.mul(market.recycleRate()).div(DECIMALS_RATE);
@@ -218,8 +294,9 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
        emit SellCt(_tokenAddress,msg.sender,_amount,acquireSut);
 
    }
-//10000000000000000000000
-//100000000000000000
+
+    //10000000000000000000000
+    //100000000000000000
     //makerValue[0] amount, makerValue[1] CTprice, makerValue[2] makerTimeStamp,
     //makerAddress[0] sourceAddress, makerAddress[1] targetAddress makerAddress[2] makerAddress
     //takerValue[0] amount, takerValue[1] CTprice, takerValue[2]takerTimeStamp , takerValue[3] takerTransactionFee,
@@ -247,6 +324,7 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
            require(ctStore(takerAddress[1]).isInFirstPeriod() && !ctStore(takerAddress[1]).dissolved());
        }else{
            require(ctStore(takerAddress[0]).isInFirstPeriod() && !ctStore(takerAddress[0]).dissolved());
+           require(ctStore(takerAddress[0]).migrationTarget() == address(0));
        }
        
        //order not filled
@@ -332,21 +410,62 @@ contract Exchange is Ownable, ExchangeConfig, Ecrecovery{
                orderFills[_makerHash] = orderFills[_makerHash].add(_sourceAmount);
 
                if (_source == address(SUT)) {
+
+                   marketAdminCheck(_target, _maker);
+                   marketAdminCheck(_target, _taker);
+                   
                    if(tokenBalance[_target][_maker] == 0) {
                        ctImpl.removeCtHolder(_target, _maker);
                    }
                    ctImpl.buyct(_target,_taker);
                }else{
+
+                   marketAdminCheck(_source, _maker);
+                   marketAdminCheck(_source, _taker);
+
                    if(tokenBalance[_source][_taker] == 0){
                        ctImpl.removeCtHolder(_source, _taker);
                    }
                    ctImpl.buyct(_source,_maker);
                }
+               
 
                emit Trade(_source,_target,_taker,_maker,_targetAmount,_sourceAmount);
    }
+
+
+
+   //upgrade Issue
+
+   function upgradeMarket(address marketAddress, address upgraderAddress, address upgrader, uint256 fee, bytes memory upgraderSign) public onlyAdmin {
+       require(ctStore(marketAddress).migrationTarget() == address(0));
+
+        bytes32 upgraderHash = keccak256(abi.encodePacked(marketAddress,upgraderAddress,upgrader, fee));
+
+        require(ecrecovery(upgraderHash, upgraderSign) == upgrader);
+
+
+        tokenBalance[address(0)][upgrader] = tokenBalance[address(0)][upgrader].sub(fee);
+        tokenBalance[address(0)][feeAccount] = tokenBalance[address(0)][feeAccount].add(fee);
+
+        ctImpl.setUpgradeMarket(marketAddress, upgraderAddress);        
+   }
+
+   function setMigrateFrom(address marketAddress, address migrateFrom, address upgrader, uint256 fee, bytes memory upgraderSign) public onlyAdmin {
+        require(ctStore(marketAddress).migrationFrom() == address(0));
+
+        bytes32 upgraderHash = keccak256(abi.encodePacked(marketAddress,migrateFrom,upgrader, fee));
+
+        require(ecrecovery(upgraderHash, upgraderSign) == upgrader);
+
+
+        tokenBalance[address(0)][upgrader] = tokenBalance[address(0)][upgrader].sub(fee);
+        tokenBalance[address(0)][feeAccount] = tokenBalance[address(0)][feeAccount].add(fee);
+
+        ctImpl.setCtMigrateFrom(marketAddress, migrateFrom);    
+   }
    
-    function destory()public onlyAdmin {
+   function destory()public onlyAdmin {
        selfdestruct(msg.sender);
    }
 

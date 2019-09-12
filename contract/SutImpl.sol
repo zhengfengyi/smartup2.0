@@ -18,8 +18,7 @@ import "./SutStore.sol";
 
  interface CtMarket {
     function isInFirstPeriod()external view returns(bool);
-    function rate()external returns(uint256); 
-    function lastRate()external returns(uint256);
+
 
  }
 
@@ -63,10 +62,16 @@ contract SutImpl is Ownable{
 
     }
 
+    function setCtMiddleware(address _middleware)public onlyOwner {
+        require(_middleware != address(0));
+
+        ctMiddleware = CtMiddleware(_middleware);
+    }
+
     
     function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime) external onlyProxy returns(address){
         
-        address ctAddress = ctMiddleware.newCtMarket(owner(),marketCreator,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
+        address ctAddress = ctMiddleware.newCtMarket(marketCreator,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
 
         sutStore.setCtMarketCreator(ctAddress,marketCreator);
         sutStore.activeCtMarket(ctAddress);

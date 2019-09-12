@@ -351,7 +351,6 @@ contract SutStore is SutStoreConfig {
         _appealRound = marketData.appealRound;
     }
 
-
     //for appeal function
     function isMarketPenddingDissolve(address ctAddress)public view returns(bool){
         return _marketData[ctAddress].state == State.PendingDissolve;
@@ -490,11 +489,6 @@ contract SutStore is SutStoreConfig {
     function getInitalDeposit(address ctAddress)public view returns(uint256){
         return _marketData[ctAddress].initialDeposit;
     }
-
-
-
-
-
 
 
     function _getMarketData(address ctAddress) private view returns (MarketData storage) {
