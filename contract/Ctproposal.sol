@@ -176,7 +176,7 @@ function donateETH(address marketAddress)public onlyStart payable{
     emit RecivedDonate(marketAddress, msg.sender, address(0), msg.value);
 }
 
-function donateERC20(address donator, address marketAddress, address erc20Address, uint256 value) public onlyStart{
+function donateERC20(address marketAddress, address erc20Address, uint256 value) public onlyStart{
     require(value > 0);
     require(!CtStore(marketAddress).dissolved());
     require(sutStore.creator(marketAddress) != address(0));
@@ -187,12 +187,12 @@ function donateERC20(address donator, address marketAddress, address erc20Addres
         marketRecived[marketAddress].add(marketAddress);
     }
 
-    require(Token(erc20Address).transferFrom(donator,address(this),value));
+    require(Token(erc20Address).transferFrom(msg.sender,address(this),value));
 
     marketTokenBalance[marketAddress][erc20Address] = marketTokenBalance[marketAddress][erc20Address].add(value);
-    donateInfo[donator][marketAddress][erc20Address] = donateInfo[donator][marketAddress][erc20Address].add(value);
+    donateInfo[msg.sender][marketAddress][erc20Address] = donateInfo[msg.sender][marketAddress][erc20Address].add(value);
 
-    emit RecivedDonate(marketAddress, donator, erc20Address, value);
+    emit RecivedDonate(marketAddress, msg.sender, erc20Address, value);
 }
 
 /**********************************************************************************

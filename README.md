@@ -365,8 +365,10 @@ uint8[] memory v  对应挂单人的 v 签名
 
 bytes memory takerSign  吃单者的签名
 
-签名的来源：一组rsv 对应的签名为 makerValue 的 amount，CTprice，makerTimeStamp 个 和 makerAddress 的 sourceAddress，targetAddress， makerAddress
+maker签名的来源：一组 rsv 对应的签名为 makerValue 的 amount，CTprice，makerTimeStamp 个 和 makerAddress 的 sourceAddress，targetAddress， makerAddress
 
+taker 签名的来源：吃单者的参数 takerValue[0] amount（数量）, takerValue[1] CTprice（价格，若价格为1个SUT 则为1000000000000000000）, takerValue[2]takerTimeStamp（吃单时间） , takerValue[3] takerTransactionFee（手续费），吃单的地址参数 takerAddress[0]sourceAddress（吃单者想要卖出的币） takerAddress[1] targetAddress（吃单者想要获取的币） takerAddress[2] takerAddress（吃单者自己的地址）
+依次按顺序
 
 事件：
 Trade(address _sourceAddress, address _targetAddress, address _taker, address _maker, uint256 _targetAmount, uint256 _sourceAmount);
@@ -383,5 +385,205 @@ uint256 _sourceAmount    吃单者卖出的数量，比如吃单者为买CT， �
 吃一笔单建议gas: 300,000 以此类推
 ```
 
+#### 12. 给市场所在的提案捐赠ETH（调用Proposal 合约）
 
+```
+function donateETH(address marketAddress)public onlyStart payable
+方法签名：0xa1e14f9f
+
+参数说明：
+address marketAddress 捐给市场的地址
+
+事件：
+event RecivedDonate(address marketAddress, address donator, address tokenAddress, uint256 value);
+address marketAddress 捐赠的市场地址
+address donator 捐赠者
+address tokenAddress 捐赠代币的token地址
+uint256 value  捐赠的数量
+
+0x9d7eb72b
+事件签名：0x8d29859c113f224d6afae8445c7c99741c85f31b9024083a21e8f8bac7ef6f6e
+```
+
+#### 13.给市场所在的提案捐赠ERC20代币(调用Proposal 合约)
+
+```
+function donateERC20(address marketAddress, address erc20Address, uint256 value) public onlyStart
+方法签名：0x9d7eb72b
+
+参数说明：
+address marketAddress   捐赠的市场地址
+address erc20Address    ERC20代币地址
+uint256 value  捐赠的数量
+
+事件：
+event RecivedDonate(address marketAddress, address donator, address tokenAddress, uint256 value);
+address marketAddress 捐赠的市场地址
+address donator 捐赠者
+address tokenAddress 捐赠代币的token地址
+uint256 value  捐赠的数量
+
+0x9d7eb72b
+事件签名：0x8d29859c113f224d6afae8445c7c99741c85f31b9024083a21e8f8bac7ef6f6e
+```
+
+#### 12. 用户发起提案(调用Proposal 合约)
+
+```
+function newProposal(uint8 _milestone, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory _beneficiary)public  onlyStart
+
+方法签名：0xec156725
+
+uint8 _milestone 里程碑数量
+address _marketAddress  发起提案的市场地址
+uint256[] memory _reward  提案奖励币的数量
+uint256[] memory _deadline  每个里程碑的结束时间
+address[] memory _rewardCoin  每个里程碑对应的奖励的币种地址
+address payable[] memory _beneficiary 每个里程碑对应的受益人地址
+
+事件：
+event NewProposal(uint256 _proposalCount, address _marketAddress, address _creator);
+
+uint256 _proposalCount  提案ID；
+address _marketAddress  发起提案的市场地址；
+address _creator  发起提案的人；
+
+事件签名：0x4c8033652a83d28932764a69975304c3acb70295a0f31e86eced53c91a22c614
+```
+
+#### 13.把提案转给其他人(调用Proposal 合约)
+
+```
+function transferProposal(uint256 _proposalId, address newCreator) public onlyStart
+
+方法签名：0x8d5b3d99
+
+参数说明：
+uint256 _proposalId  提案ID
+address newCreator   新的creator 地址
+```
+
+#### 14.获取提案状态(调用Proposal 合约)
+
+```
+   function getPropsoalStatus(uint256 _proposalId) public view returns(bool) {
+       return proposals[_proposalId].active;
+   } 
+
+   function getProposalMarket(uint256 _proposalId) public view returns(address) {
+       return proposals[_proposalId].market;
+   }
+   
+   function getProposalCreator(uint256 _proposalId) public view returns(address) {
+       return  proposals[_proposalId].creator;
+   }
+
+   function getProposalStage(uint256 _proposalId) public  view returns(uint8) {
+       return  proposals[_proposalId].stage;
+   }
+
+   function getProposalMilestone(uint256 _proposalId) public  view returns(uint8) {
+       return  proposals[_proposalId].milestone;
+   }
+
+   function getProposalReward(uint256 _proposalId) public view returns(uint256[] memory) {
+       return  proposals[_proposalId].reward;
+   }
+
+   function getProposalDeadline(uint256 _proposalId) public view returns(uint256[] memory) {
+       return  proposals[_proposalId].deadline;
+   }
+
+   function getProposalRewardCoin(uint256 _proposalId) public view returns(address[] memory) {
+       return  proposals[_proposalId].rewardCoin;
+   }
+
+   function getProposalBeneficiary(uint256 _proposalId) public  view returns(address payable[] memory) {
+       return  proposals[_proposalId].beneficiary;
+   }
+
+   function getProposalVote(uint256 _proposalId, uint8 _stage) public view returns(uint256) {
+       return proposals[_proposalId].vote[_stage];
+   }
+
+   function getProposalDetaials(uint256 _proposalId, uint8 _stage) public view returns(address[] memory) {
+       return proposals[_proposalId].votedetails[_stage];
+   }
+
+   function isVoteForProposal(address _voter, uint256 _proposalId, uint8 _milestone) public view returns(bool) {
+       return isVote[_voter][_proposalId][_milestone];
+   }
+```
+
+#### 15.获取提案ID对应的市场地址(调用Proposal 合约)
+
+```
+function getProposalMarket(uint256 _proposalId) public view returns(address)
+
+方法签名：0x8d5b3d99
+
+参数说明：
+uint256 _proposalId  提案ID
+address newCreator   新的creator 地址
+```
+
+#### 16. 获取对应提案的创建者(调用Proposal 合约)
+
+```
+
+```
+
+#### 17. 获取对应提案的当前里程碑阶段(调用Proposal 合约)
+
+```
+
+```
+
+#### 18. 获取对应提案的总的里程碑阶段数量(调用Proposal 合约)
+
+```
+
+```
+
+#### 19. 获取对应提案的奖励代币数量(调用Proposal 合约)
+
+```
+
+```
+
+#### 20. 获取对应提案的各个里程碑截至时间(调用Proposal 合约)
+
+```
+
+```
+
+#### 21. 获取对应提案的奖励币种(调用Proposal 合约)
+
+```
+
+```
+
+#### 22.  获取对应提案的受益人信息(调用Proposal 合约)
+
+```
+
+```
+
+#### 23.获取对应提案的对应里程碑阶段的得票数量(调用Proposal 合约)
+
+```
+
+```
+
+#### 24. 获取对应提案对应阶段的投票信息(调用Proposal 合约)
+
+```
+
+```
+
+#### 25. 获取某个地址是否对 提案的某个阶段投票情况(调用Proposal 合约)
+
+```
+
+```
 
