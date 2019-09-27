@@ -105,7 +105,7 @@ uint256 _total   当前余额；
 
 ```
 
-#### 2.存ETH（调用的合约Exchange）
+#### 2.存ETH（调用的合约CoinStore 合约）
 
 ```
 function depositEther()public payable
@@ -144,7 +144,7 @@ uint256 _amount 存的数量
 uint256 _total   当前余额
 ```
 
-#### 4.用户自己取钱（调用的合约Exchange）
+#### 4.用户自己取钱（调用的合约CoinStore ）
 
 ```
 function withdraw(address _token, uint256 _amount)public
@@ -164,42 +164,36 @@ uint256 _reamain 用户余额
 事件签名：0xf341246adaac6f497bc2a656f546ab9e182111d630394f0c57c710a59a2cb567
 ```
 
-#### 4.管理员帮用户取钱（调用的合约Exchange）
+#### 4.授权创建市场，提案 和交易 （调用的合约CoinStore ）
 
 ```
-function adminWithdraw(address _token, uint256 _amount, address payable _owner, uint256 feeWithdraw, bytes32 _hash, bytes memory sign)public onlyAdmin
-方法签名：
-0x04c557a9
+function setAlloweds(address[] memory _setAddress) public
+
+方法签名：0x85ae6ccc
+
+
+参数说明：  
+address[] memory _setAddress  exchange, ctProposal, marketOpration 地址
+```
+
+#### 5. 取消授权（创建市场，提案，交易）（调用的合约CoinStore ）
+
+```
+function cancelAllowed(address[] memory _allowedAddress) public
+
+方法签名：0x173a8b2e
 
 参数说明：
-address _token  取钱token地址，若为eth则为（0x0000000000000000000000000000000000000000）
-uint256 _amount 数量(必须大于10的15次方)
-address payable _owner  取钱的用户地址
-uint256 feeWithdraw 取钱的手续费
-bytes32 签名时时间戳哈希
-bytes memory sign  用户对_token，_amount，_owner，feeWithdraw的签名
-
-签名的数据: _token, _amount, _owner, nonce, feeWithdraw, _hash，
-
-事件：
-AdminWithdarw(address _withdrawer, address _token, address _owner, uint256 _value, uint256 _fee, uint256 _remain);
-事件签名：
-0x379612486dbf6da40d2087b9ab46f0630c963e9c92d24087c00af355ef39fe0d
-参数说明：
-address _withdrawer  帮用户取钱的admin地址
-address _token  取钱的token，若为eth则为（0x0000000000000000000000000000000000000000）
-address _owner  取钱的人
-uint256 _value 一共取了多少
-uint256 _fee 手续费
-uint256 _reamain 用户余额
-
+address[] memory _allowedAddress  取消功能的合约地址
 ```
 
-#### 5. 查询余额（调用的合约Exchange）
+#### 6. 查询余额（调用的合约CoinStore ）
 
 ```
-mapping (address => mapping(address => uint256)) public tokenBalance;
-tokenBalance[address][address];
+function balanceOf(address _token, address _owner) public view returns(uint256)；
+
+方法签名：0xf7888aec
+
 参数说明
 adddress   token地址(若为eth则为（0x0000000000000000000000000000000000000000）,sut则为sut地址)
 address    要查询的账号地址
@@ -208,12 +202,12 @@ address    要查询的账号地址
 uint256   用户对应的token余额
 ```
 
-#### 6. 创建市场（调用的合约Exchange）
+#### 7. 创建市场（调用的合约 MarketOperation）
 
 ````
-function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, uint256 _closingTime, bytes memory signature) public onlyAdmin
+function createCtMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 fee, uint256 _closingTime, uint256 cFee, uint256 dFee, bytes memory signature) public
 
-方法签名：0x435dbf35
+方法签名：0x0b2b2ba0
 
 参数说明：
 address marketCreator  市场创建者
@@ -225,9 +219,11 @@ uint256 _rate     第一阶段 CT 兑换 SUT 比例（1 个 ct 能换 0.1 个 su
 uint256 _lastRate  市场最后的兑换价格(同 _rate)
 uint256 fee  创建市场的费用
 uint256 _closingTime 市场的有效时间（以秒为单位，1 - 90 天时长）
+uint256 cFee  创建市场时的用于总结投票的手续费
+uint256 dFee  解散市场的手续费用
 bytes memory signature 签名
 
-签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, Fee,_closingTime
+签名的数据：marketCreate， initialDeposit, _name, _symbol, _supply, _rate, _lastRate, Fee,_closingTime，cFee，dFee
 
 事件一：
 MarketCreated(address _ctAddress,address _marketCreator,uint256 _initialDeposit);
@@ -239,13 +235,14 @@ address _marketCreator 市场创建者
 uint256 _initialDeposit  创建市场的押金
 
 事件二： 
-event BalanceChange(address _owner, uint256 _sutRemain, uint256 _ethRemain);
+InternalTransfer(address _token, address _from, address _to, uint256 _value);
 签名：
-0xf4e3f146ef01bfe65e811aade3a860b33927625771e1f2c45ae705ae2e44d3e8
+0xfadbd2c5af7722bf6190fc9d4fcdd9a4db86a35ad9a560436ae25ac41e690a47
 参数说明：
-address _owner  改变余额的地址
-uint256 _sutRemain  sut余额
-uint256 _ethRemain  eth余额
+address _token 内部转账的地址
+address _from  转出者地址
+address _from  转入者地址
+uint256 _value 转账金额
 
 消耗的gas信息：    //0x3d37e33c589b3b105f8752239b5298386e04cda3039529654cee303d272a3ad6
 Gas Limit:
@@ -308,16 +305,22 @@ Gas Limit:
 推荐 320,000
 ````
 
-#### 9.最后卖出CT （调用的合约Exchange）
+#### 9.最后卖出CT  回收CT（调用的合约Exchange）
 
 ````
-function sellCt(address _tokenAddress, uint256 _amount)public
+function recycleCT(address _tokenAddress, address seller, uint256 amount, uint256 timeStamp, uint256 fee, bytes memory sign) public
 方法签名：
-0x3610f844
+0x0444dd58
 
 参数说明：
 address _tokenAddress  Ct市场地址
-uint256 _amount   ct数量(ct数量必须大于等于 1 个 即 10 ** 18)
+address seller 出售的人
+uint256 _amount   ct数量
+uint256 timeStamp 事件戳
+uint256 fee 手续费用
+bytes memory sign 签名
+
+签名的数据：_tokenAddress，seller，amount，timeStamp，fee
 
 事件：
 SellCt(address _ctAddress, address _seller, uint256 _amount, uint256 acquireSut);
@@ -346,7 +349,7 @@ false  不在第一阶段
 #### 11.第二阶段交易(调用Exchange 合约)
 
 ```
-function trade(uint256[] memory makerValue, address[] memory makerAddress, uint256[4] memory takerValue, address[3] memory takerAddress, bytes32[] memory rs, uint8[] memory v, bytes memory takerSign)public onlyAdmin
+function trade(uint256[] memory makerValue, address[] memory makerAddress, uint256[5] memory takerValue, address[3] memory takerAddress, bytes32[] memory rs, uint8[] memory v, bytes memory takerSign)public onlyAdmin
 
 方法签名：0xb94140b1
 
@@ -355,7 +358,7 @@ uint256[] memory makerValue 每三个为一个挂单(maker)的参数makerValue[0
 
 address[] memory makerAddress 每三个为一个挂单的参数 makerAddress[0] sourceAddress(挂单的币想要卖出的币), makerAddress[1] targetAddress（想要换取得币） makerAddress[2] makerAddress（挂单者自己的地址）
 
-uint256[4] memory takerValue  吃单者的参数 takerValue[0] amount（数量）, takerValue[1] CTprice（价格，若价格为1个SUT 则为1000000000000000000）, takerValue[2]takerTimeStamp（吃单时间） , takerValue[3] takerTransactionFee（手续费）
+uint256[4] memory takerValue  吃单者的参数 takerValue[0] amount（数量）, takerValue[1] CTprice（价格，若价格为1个SUT 则为1000000000000000000）, takerValue[2]takerTimeStamp（吃单时间） , takerValue[3] takerTransactionFee（手续费），takerValue[4] 为管理员设置的手续费 
 
 address[3] memory takerAddress 吃单的地址参数 takerAddress[0]sourceAddress（吃单者想要卖出的币） takerAddress[1] targetAddress（吃单者想要获取的币） takerAddress[2] takerAddress（吃单者自己的地址）
 
@@ -388,33 +391,20 @@ uint256 _sourceAmount    吃单者卖出的数量，比如吃单者为买CT， �
 #### 12. 给市场所在的提案捐赠ETH（调用Proposal 合约）
 
 ```
-function donateETH(address marketAddress)public onlyStart payable
-方法签名：0xa1e14f9f
+function donateCoinToProposal(address _token, address _donator, address _marketAddress, uint256 _value, uint256 _fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0xa59b991d
 
 参数说明：
+address _token  捐赠的币种
+address _donator 捐赠者
 address marketAddress 捐给市场的地址
+uint256 _value 捐赠的数量
+uint256 _fee 手续费
+uint256 timeStamp 事件戳
+bytes memory sign 签名
 
-事件：
-event RecivedDonate(address marketAddress, address donator, address tokenAddress, uint256 value);
-address marketAddress 捐赠的市场地址
-address donator 捐赠者
-address tokenAddress 捐赠代币的token地址
-uint256 value  捐赠的数量
-
-0x9d7eb72b
-事件签名：0x8d29859c113f224d6afae8445c7c99741c85f31b9024083a21e8f8bac7ef6f6e
-```
-
-#### 13.给市场所在的提案捐赠ERC20代币(调用Proposal 合约)
-
-```
-function donateERC20(address marketAddress, address erc20Address, uint256 value) public onlyStart
-方法签名：0x9d7eb72b
-
-参数说明：
-address marketAddress   捐赠的市场地址
-address erc20Address    ERC20代币地址
-uint256 value  捐赠的数量
+签名的数据：_token，_donator，_marketAddress，_value，_fee，timeStamp
 
 事件：
 event RecivedDonate(address marketAddress, address donator, address tokenAddress, uint256 value);
@@ -430,16 +420,23 @@ uint256 value  捐赠的数量
 #### 12. 用户发起提案(调用Proposal 合约)
 
 ```
-function newProposal(uint8 _milestone, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory _beneficiary)public  onlyStart
+function newProposal(uint8 _milestone, address _creator, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address[] memory _beneficiary, uint256 fee, uint256 proposalFee, uint256 timeStamp, bytes memory sign)public onlyStart
 
-方法签名：0x3f6dcb7a
+方法签名：0x3d709560
 
 uint8 _milestone 里程碑数量
+address _creator 提案创建者
 address _marketAddress  发起提案的市场地址
 uint256[] memory _reward  提案奖励币的数量
 uint256[] memory _deadline  每个里程碑的结束时间
 address[] memory _rewardCoin  每个里程碑对应的奖励的币种地址 ETH 为0x0000000000000000000000000000000000000000
 address payable[] memory _beneficiary 每个里程碑对应的受益人地址
+uint256 fee 手续费
+uint256 proposalFee 用于对总结提案的手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+签名的数据：_milestone，_creator，_marketAddress，fee，proposalFee，timeStamp
 
 事件：
 event NewProposal(uint256 _proposalCount, address _marketAddress, address _creator);
@@ -454,13 +451,21 @@ address _creator  发起提案的人；
 #### 13.把提案转给其他人(调用Proposal 合约)
 
 ```
-function transferProposal(uint256 _proposalId, address newCreator) public onlyStart
+function transferProposal(uint256 _proposalId, address rawCreator, address newCreator, uint256 fee, 
+uint256 timeStamp，bytes memory sign) public onlyStart 
 
-方法签名：0x8d5b3d99
+方法签名：0xf840d0f1
 
 参数说明：
 uint256 _proposalId  提案ID
+address rawCreator   原本的creator
 address newCreator   新的creator 地址
+uint256 fee 手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+签名的数据： _proposalId，rawCreator，newCreator，fee，timeStamp
+
 ```
 
 #### 14.获取提案状态(调用Proposal 合约)
@@ -638,40 +643,78 @@ bool true 已经投票， false 没有投票
 #### 26.提案创建者修改提案(调用Proposal 合约)
 
 ```
-function modifyProposal(uint256 _proposalId, uint8 _milestone, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory _beneficiary) public onlyStart
+function modifyProposal(uint256 _proposalId, address _creator, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address[] memory _beneficiary, uint256 fee, uint256 timeStamp, bytes memory sign) public onlyStart
 
-方法签名：0xc051dc22
+方法签名：0xa2d484e8
 
 参数说明：
 uint256 _proposalId  提案ID
-uint8 _milestone    里程碑数
+address _creator 提案的创建者
 uint256[] memory _reward  奖励代币数量
 uint256[] memory _deadline  提案对应里程碑截至时间
 address[] memory _rewardCoin  提案的奖励币种  ETH则为0x0000000000000000000000000000000000000000
 address payable[] memory _beneficiary  受益人地址
+uint256 fee 手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+签名的数据：_proposalId, _creator, fee,timeStamp
+
 
 ```
 
 #### 27. 给提案投票(调用Proposal 合约)
 
 ```
-function vote(uint256 _proposalId)public onlyStart 
+function vote(uint256 _proposalId, address voter, uint256 fee, uint256 timeStamp, bytes memory sign)public onlyStart
 
-方法签名：0x0121b93f
+方法签名：0x6ee0b7d8
 
 参数说明：
 uint256 _proposalId  提案ID
+address voter 投票人
+uint256 fee 手续费
+uint256 timeStamp  时间戳
+bytes memory sign 签名
+
+签名的数据：_proposalId, voter, fee,timeStamp
 ```
 
 #### 28. 提案时间截止时总结提案(调用Proposal 合约)
 
 ```
-function conclusionVote(uint256 _proposalId) public onlyStart
-方法签名：0x4d64bcea
+function conclusionVote(uint256 _proposalId, address concluder, uint256 fee, uint256 timeStamp, bytes memory sign) public onlyStart
+方法签名：0x2730e21b
 
 参数说明：
 uint256 _proposalId  提案ID
+address concluder  总结的人
+uint256 fee 手续费
+uint256 timeStamp  时间戳
+bytes memory sign  签名
+
+签名来源：_proposalId, concluder, fee,timeStamp
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #### 29.市场解散后市场的人领取属于市场的币(调用Proposal 合约)
 
