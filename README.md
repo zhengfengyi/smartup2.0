@@ -3,66 +3,37 @@
 #### 合约步骤
 
 ```
-1.SUT token合约 （ctConfig 需要设置） 0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03
-2.NTT 合约  （ctConfig 需要设置）（如果需要增加更改NTT权限 去要设置） 0x846cE03199A759A183ccCB35146124Cd3F120548
+1. SUToken: 0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03
 
-3.sutStore 合约      0xbEa30a20693cf6470d57C7FB396F79531D0FF1D3
-   Gas Limit: 4027415
-   Gas Price: 10 Gwei
-   Fee:0.0402 Ether
+2. NTT: 0x846cE03199A759A183ccCB35146124Cd3F120548
 
-4.SutProxy 合约   0xcE03Adb6c9Cd167039417b0CBFA421349b2d8C22
-Value:
-0 Ether ($0.00)
-Transaction Fee:
-0.05008636 Ether ($0.000000)
-Gas Limit:
-2,504,318
-Gas Used by Transaction:
-2,504,318 (100%)
-Gas Price:
-0.00000002 Ether (20 Gwei)
+3. SUTStore: 0x8b5218c9Ba7DDD9A080BB994F2cB571C337937B8 
+需要设置IcoinStore；需要设置  SutImpl 地址
 
-CtProposal(需要设置Exchange 地址) 0xc6Ab19f4adB704e729334695D3FbfCBc86d1039A
+4. SUTProxy : 0xCc4c64484E3Ccb3B53F96D9a01Fc2C6a3bbD445A 
+(需要设置 SUTImpl ) 还需要设置  MarketOperation 地址
 
-5.CTimpl 合约   0x6B907D4Dd3F63e1123FAE2c6572Ca6F48a6C5D83
-Value:
-0 Ether ($0.00)
-Transaction Fee:
-0.03207403 Ether ($0.000000)
-Gas Limit:
-3,207,403
-Gas Used by Transaction:
-3,207,403 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
+5. Admin: 0xA1aD57b78b6318D35f5C136bD83e4dAAB3345718 
+需要设置Admin 到其他合约
+
+6. Exchange: 0xa87824ffC45A217BB2aDb257f7DD9C82856140Dc 
+后面需要设置 address _ctImpl, address _proposal, coinStore 3个地址
+
+7.  MarketOperation：  0x4325c9e5689997c9bB268B5cD70f867c7394260D
+后面需要设置 address _ctImpl, address _proposal, coinStore 3个地址
+
+8. CtProposal： 0x4606B146c187998523ffD3E056F3C380750BC485
+
+需要设置 coinStore 地址；
 
 
-6.SutImpl合约    0xB2e1DEAE6f7E0DE18Fc7d90eE2dA5a2d98526891
-Transaction Fee:
-0.0564316 Ether ($0.000000)
-Gas Limit:
-5,643,160
-Gas Used by Transaction:
-5,643,160 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
-7.Exchange 合约   0xD6f5F5029cAB6BE693Dd1e477A6cca3A07CaF03C
-Gas Limit:
-2,870,286
-Gas Used by Transaction:
-2,870,286 (100%)
-Gas Price:
-0.00000001 Ether (10 Gwei)
-8.SutStore 设置sutImplAddress
+9 CtImpl： 0xce8516Bb536FeF6e04deadA01824A66C264C820d
 
-9.SutProxy 设置sutImplAddress 设置 Exchange地址
+需要设置 coinStore  sutImpl 地址； 
 
-10. SutProxy 设置 exchange Address
+10 SutImpl 0x53621dE728d274aC59808F349c6dA667f114D9F2 需要设置 进 SUTStore，SUTProxy， CtImpl
 
-11.CTimpl 设置 sutImpl地址  exchange地址
-
-12.Exchange 设置Admin
+11 coinStore 0x3e4a8EBD9BB12aec29bf39792046a26E0438B40D
 
 ```
 
