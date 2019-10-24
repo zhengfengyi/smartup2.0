@@ -35,16 +35,8 @@ contract SutProxy is SutProxyConfig{
     event MakeVote (address _ctAddress, address _voter, uint8 _appealRound,  bool _details);
 
     event DissolvedCtMarket(address _ctAddress);
-
-    // we're not supposed to accept ETH?
-
-    function() payable external {
-
-        revert();
-
-    }
     
-    constructor(address _nttAddress, address _sutAddress, address _sutStoreAddress, address _owner)public SutProxyConfig(_nttAddress,_sutAddress,_sutStoreAddress,_owner){
+    constructor(address _nttAddress, address _sutStoreAddress, address _owner)public SutProxyConfig(_nttAddress,_sutStoreAddress,_owner){
 
     }
 
@@ -59,57 +51,23 @@ contract SutProxy is SutProxyConfig{
 
      **********************************************************************************/
     
-    function createMarket(address marketCreator, uint256 initialDeposit, string memory _name, string memory _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime) public returns(address _ctAddress){
-        require(msg.sender == address(exchange)); 
+    function createMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime, uint256 cfee, uint256 dfee) external onlyMarketOpration returns(address _ctAddress){
 
         require(initialDeposit == CREATE_MARKET_DEPOSIT_REQUIRED);
-
-        require(exchange.balanceOf(address(SUT), marketCreator) >= initialDeposit);
 
         require(NTT.isAllow(marketCreator, CREATE_MARKET_NTT_KEY), "Not enough NTT");
         
         require(_rate > 0 && _lastRate > 0 && _rate > _lastRate);
 
-        //require(SUT.transferFrom(marketCreator, sutStoreAddress, initialDeposit), "SUT transfer unsuccessful");
-
-        _ctAddress = sutImpl._newCtMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
+        _ctAddress = SutImpl._newCtMarket(marketCreator,initialDeposit,_name,_symbol,_supply,_rate, _lastRate,_closingTime, cfee, dfee);
 
     }
 
-    function emitMarketCreated(address _ctAddress, address _marketCreator, uint256 _initialDeposit) public onlyImpl {
+    function emitMarketCreated(address _ctAddress, address _marketCreator, uint256 _initialDeposit) external onlyImpl {
 
-       emit MarketCreated(_ctAddress,_marketCreator,_initialDeposit);
+       emit MarketCreated(_ctAddress, _marketCreator, _initialDeposit);
 
     }
-
-    /**********************************************************************************
-
-     *                                                                                *
-
-     * First Period Buy Ct session                                                                     *
-
-     *                                                                                *
-
-     **********************************************************************************/
-    
-    // function addHolder(address _ctAddress, address _holder)public{
-    //     require(msg.sender == address(exchange));
-
-    //     sutImpl._addHolder(_ctAddress, _holder);
-    // }
-
-    // function removeHolder(address _ctAddress, address _holder)public{
-    //     require(msg.sender == address(exchange));
-
-    //     sutImpl._removeHolder(_ctAddress,_holder);
-    // }
-
-    // function finishCtFirstPeriod(address _ctAddress)public{
-    //     require(msg.sender == address(exchange));
-
-    //     sutImpl._finishCtFirstPeriod(_ctAddress);
-    // }
-
 
     /**********************************************************************************
 
@@ -120,18 +78,25 @@ contract SutProxy is SutProxyConfig{
      *                                                                                *
 
      **********************************************************************************/
+    function flag(address ctAddress, address flagger, uint256 depositAmount, uint256 fFee) external onlyMarketOpration {
 
-    function flag(address ctAddress, address flagger, uint256 depositAmount) private {
-        // attempt to make SUT transfer to this contract
         require(depositAmount >= MINIMUM_FLAGGING_DEPOSIT);
-        require(SUT.transferFrom(flagger, sutStoreAddress, depositAmount));
 
-        sutImpl._flagMarket(ctAddress,flagger,depositAmount);
+
+        SutImpl._flagMarket(ctAddress,flagger,depositAmount,fFee);
     }
 
-    function emitFlagging(address _projectAddress, address _flagger, uint256 _deposit, uint256 _totalDeposit)public onlyImpl{
+    function emitFlagging(address _projectAddress, address _flagger, uint256 _deposit, uint256 _totalDeposit)external onlyImpl{
 
         emit Flagging(_projectAddress, _flagger, _deposit, _totalDeposit);
+    }
+
+    function closeFlagging(address ctAddress, address closer) public onlyMarketOpration{
+        SutImpl._closeFlagging(ctAddress,closer);
+    }
+
+    function emitCloseFlagging(address _ctAddress, address _closer)public onlyImpl {
+        emit CloseFlagging(_ctAddress, _closer);
     }
 
     /**********************************************************************************
@@ -143,16 +108,26 @@ contract SutProxy is SutProxyConfig{
      *                                                                                *
 
      **********************************************************************************/
-    function appeal(address ctAddress, address appealer, uint256 depositAmount) private {
-        require(depositAmount >= APPEALING_DEPOSIT_REQUIRED);
-        require(SUT.transferFrom(appealer, sutStoreAddress, depositAmount), "SUT transfer unsuccessful");
 
-        sutImpl._applealMarket(ctAddress, appealer, depositAmount);
+    function appeal(address ctAddress, address appealer, uint256 cfee, uint256 depositAmount) external onlyMarketOpration {
+
+        require(depositAmount >= MINIMUM_APPEAL_DEPOSIT);
+
+        SutImpl._applealMarket(ctAddress, appealer,cfee, depositAmount);
     }
 
-    function emitAppealMarket(address ctAddress, address appealer, uint256 depositAmount) public onlyImpl {
+    function closeAppealing(address ctAddress, address closer) external onlyMarketOpration{
+        SutImpl._closeAppealing(ctAddress, closer);
+    }
+
+    function emitAppealMarket(address ctAddress, address appealer, uint256 depositAmount) external onlyImpl {
         emit AppealMarket( ctAddress,  appealer,  depositAmount);
  
+    }
+
+    function ctNotSellOutDissovle(address ctAddress, address doer) external onlyMarketOpration {
+
+        SutImpl.notSellOutDissovle(ctAddress,doer);
     }
 
     /**
@@ -162,19 +137,14 @@ contract SutProxy is SutProxyConfig{
      *
 
      */
-    function closeFlagging(address ctAddress)public{
-        sutImpl._closeFlagging(ctAddress,msg.sender);
-    }
 
-    function emitCloseFlagging(address _ctAddress, address _closer)public onlyImpl {
-        emit CloseFlagging(_ctAddress, _closer);
-    }
     
 
 
     //vote
-    function vote(address ctAddress, bool dissolve) external {
-        sutImpl._vote(ctAddress, msg.sender, dissolve);
+    function vote(address ctAddress, address voter, bool dissolve) external onlyMarketOpration {
+        
+        SutImpl._vote(ctAddress, voter, dissolve);
     }
 
     function emitMaketVote(address ctAddress, address voter, uint8 appealRound, bool dissolve)public onlyImpl{
@@ -183,16 +153,21 @@ contract SutProxy is SutProxyConfig{
 
 
     //conclude
-    function conclude(address ctAddress) external {
-         sutImpl._concludeMarket(ctAddress);
+    function conclude(address ctAddress, address concluder) external onlyMarketOpration {
+        SutImpl._concludeMarket(ctAddress,concluder);
     }
 
-    function prepareDissolve(address ctAddress) external {
-        sutImpl._prepareDissovle(ctAddress);
+    function prepareDissolve(address ctAddress, address doer) external onlyMarketOpration{
+
+        SutImpl._prepareDissovle(ctAddress, doer);
+    }
+
+    function upgradeMarket(address ctAddress)external onlyMarketOpration{
+        SutImpl._upgradeMarket(ctAddress);
     }
 
     // function dissolved(address ctAddress)external {
-    //     sutImpl._dissolve(ctAddress);
+    //     sutStore._dissolve(ctAddress);
     // }
 
 
@@ -206,108 +181,117 @@ contract SutProxy is SutProxyConfig{
     //other function for view 
     function creator(address ctAddress) external view returns (address) {
 
-        return sutImpl._creator(ctAddress);
+        return sutStore.creator(ctAddress);
 
     }
 
 
-    function state(address ctAddress) external view returns (uint8) {
+    function getState(address ctAddress) external view returns (uint8) {
 
-        return sutImpl._state(ctAddress);
+        return sutStore.state(ctAddress);
 
     }
 
 
     function flaggerSize(address ctAddress) external view returns (uint256) {
 
-        return sutImpl._flaggerSize(ctAddress);
+        return sutStore.flaggerSize(ctAddress);
     }
 
 
     function flaggerList(address ctAddress) external view returns (address[] memory) {
 
-        return sutImpl._flaggerList(ctAddress);
+        return sutStore.flaggerList(ctAddress);
 
     }
 
-
     function flaggerDeposits(address ctAddress) external view returns (uint256[] memory) {
 
-        return sutImpl._flaggerDeposits(ctAddress);
+        return sutStore.flaggerDeposits(ctAddress);
 
+    }
+
+    function appealerSize(address ctAddress) public view returns (uint256) {
+        return sutStore.appealerSize(ctAddress);
+    }
+
+    function appealerList(address ctAddress) public view returns (address[] memory) {
+        return sutStore.appealerList(ctAddress);
+    }
+
+    function appealersDeposit(address ctAddress) public view returns (uint256[] memory) {
+        return sutStore.appealersDeposit(ctAddress);
+    }
+
+    function appealerTotalDeposit(address ctAddress) public view returns (uint256) {
+        return sutStore.appealerTotalDeposit(ctAddress);
     }
 
 
     function jurorSize(address ctAddress) external view returns (uint256) {
 
-        return sutImpl._jurorSize(ctAddress);
+        return sutStore.jurorSize(ctAddress);
 
     }
 
     function jurorList(address ctAddress) external view returns (address[] memory) {
 
-        return sutImpl._jurorList(ctAddress);
+        return sutStore.jurorList(ctAddress);
 
     }
 
 
     function totalFlaggerDeposit(address ctAddress) external view returns (uint256) {
-
-        return sutImpl._totalFlaggerDeposit(ctAddress);
+        
+        return sutStore.getFlaggerDeposit(ctAddress);
 
     }
-
 
     function totalCreatorDeposit(address ctAddress) external view returns (uint256) {
 
-        return sutImpl._totalCreatorDeposit(ctAddress);
+        return sutStore.getInitalDeposit(ctAddress);
 
     }
-
 
     function nextFlaggableDate(address ctAddress) external view returns (uint256) {
 
-        return sutImpl._nextFlaggableDate(ctAddress);
+        return sutStore.nextFlaggableDate(ctAddress);
 
     }
 
-
     function flaggingPeriod(address ctAddress) external view returns (uint256 start, uint256 end) {
-        (start,end) = sutImpl._flaggingPeriod(ctAddress);
+        (start,end) = sutStore.flaggingPeriod(ctAddress);
     }
 
 
     function votingPeriod(address ctAddress) external view returns (uint256 start, uint256 end) {
-        (start,end) = sutImpl._votingPeriod(ctAddress);
+        (start,end) = sutStore.votingPeriod(ctAddress);
     }
 
 
     function appealingPeriod(address ctAddress) external view returns (uint256 start, uint256 end) {
-        (start,end) = sutImpl._appealingPeriod(ctAddress);
+        (start,end) = sutStore.appealingPeriod(ctAddress);
     }
 
 
     function appealRound(address ctAddress) external view returns (uint8) {
 
-        return sutImpl._appealRound(ctAddress);
+        return sutStore.appealRound(ctAddress);
 
     }
 
 
     function ballots(address ctAddress) external view returns (uint8) {
 
-        return sutImpl._ballots(ctAddress);
+        return sutStore.ballots(ctAddress);
 
     }
-
 
     function marketSize() external view returns (uint256) {
 
-        return sutImpl._marketSize();
+        return sutStore.marketSize();
 
     }
-
-
 
 }
 

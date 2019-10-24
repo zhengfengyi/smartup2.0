@@ -7,6 +7,8 @@ import "./SafeMath.sol";
 
 import "./SutStoreConfig.sol";
 
+
+
 /**
 
  * @title SmartUp platform contract
@@ -39,23 +41,33 @@ contract SutStore is SutStoreConfig {
 
         IterableSet.AddressSet flaggers;
 
+        IterableSet.AddressSet appealers;
+
         uint256[] flaggersDeposit;
+
+        uint256[] appealersDeposit;
 
         IterableSet.AddressSet jurors;
 
         Vote[] jurorVotes;
 
+        bool  exchangeAvailable;
+
         uint8 appealRound;
 
         uint8 ballots;
 
+        uint256 dissolveFee;
+
+        uint256 cConclusionFee;
+
+        uint256 fConclusionFee;
+
         uint256 flaggerDeposit;
 
-        // uint256 totalAppealSut;
+        uint256 appealerDeposit;
 
         uint256 initialDeposit;
-
-        uint256 appealingDeposit;
 
         uint256 lastFlaggingConcludedAt;
 
@@ -73,19 +85,11 @@ contract SutStore is SutStoreConfig {
 
         require(_marketData[msg.sender].creator != address(0));
 
-        _;
+        _; 
 
     }
 
-    constructor(address _sutTokenAddress, address _owner, address _impl)public SutStoreConfig(_sutTokenAddress,_owner,_impl){
-
-    }
-
-
-    // we're not supposed to accept ETH?
-    function() payable external {
-
-        revert();
+    constructor(address _sutTokenAddress, address _owner, address icoinStore)public SutStoreConfig(_sutTokenAddress,_owner,icoinStore){
 
     }
 
@@ -111,7 +115,7 @@ contract SutStore is SutStoreConfig {
         _marketData[ctAddress].state = State.Voting;
     }
 
-    function pendindDissolveCtMarket(address ctAddress)public onlyImpl  {
+    function pendindDissolveCtMarket(address ctAddress)public onlyImpl {
         _marketData[ctAddress].state = State.PendingDissolve;
     }
 
@@ -125,13 +129,13 @@ contract SutStore is SutStoreConfig {
     }
 
     //SetCtflaggersDeposit
-    function pushCtFlaggersDeposit(address ctAddress, uint256 deposit)public onlyImpl {
-        _marketData[ctAddress].flaggersDeposit.push(deposit);
-    }
+    // function pushCtFlaggersDeposit(address ctAddress, uint256 deposit)public onlyImpl {
+    //     _marketData[ctAddress].flaggersDeposit.push(deposit);
+    // }
 
-    function setCtFlaggersDeposit(address ctAddress, uint256 position, uint256 deposit)public onlyImpl  {
-        _marketData[ctAddress].flaggersDeposit[position] = deposit;
-    }
+    // function setCtFlaggersDeposit(address ctAddress, uint256 position, uint256 deposit)public onlyImpl  {
+    //     _marketData[ctAddress].flaggersDeposit[position] = deposit;
+    // }
 
     function clearCtFlaggersDeposit(address ctAddress)public onlyImpl {
         delete _marketData[ctAddress].flaggersDeposit;
@@ -150,7 +154,6 @@ contract SutStore is SutStoreConfig {
 
     }
 
-
     //set Ct lastFlaggingConcludedAt
     function setLastFlaggingConclude(address ctAddress, uint256 time)public onlyImpl  {
         _marketData[ctAddress].lastFlaggingConcludedAt = time;
@@ -168,10 +171,7 @@ contract SutStore is SutStoreConfig {
 
     function ableFlagCtMarket(address ctAddress)public view returns(bool) {
         return now.sub(_marketData[ctAddress].lastFlaggingConcludedAt) > PROTECTION_PERIOD;
-    }
-    
-
-
+    }   
     /**********************************************************************************
 
      *                                                                                *
@@ -181,7 +181,6 @@ contract SutStore is SutStoreConfig {
      *                                                                                *
 
      **********************************************************************************/
-    
     function flaggingNotStarted(address ctAddress)public view returns(bool){
         return _marketData[ctAddress].flaggingStartedAt == 0;
     }
@@ -206,12 +205,7 @@ contract SutStore is SutStoreConfig {
         _marketData[ctAddress].flaggersDeposit[pos - 1] = _marketData[ctAddress].flaggersDeposit[pos - 1].add(depositAmount);
     }
 
-    function addFlager(address ctAddress, address flager)public onlyImpl {
-         _marketData[ctAddress].flaggers.add(flager);
-    }
-
     function pushFlagerDeposit(address ctAddress, uint256 deposit)public onlyImpl {
-        require(deposit >= MINIMUM_FLAGGING_DEPOSIT);
         _marketData[ctAddress].flaggersDeposit.push(deposit);
     }
     
@@ -220,6 +214,64 @@ contract SutStore is SutStoreConfig {
     }
     function FlaggerDepositIsOk(address ctAddress)public view returns(bool){
         return _marketData[ctAddress].flaggerDeposit >= FLAGGING_DEPOSIT_REQUIRED;
+    }
+
+    /**********************************************************************************
+
+     *                                                                                *
+
+     * appeal session                                                                   *
+
+     *                                                                                *
+
+     **********************************************************************************/
+    function getAppealersSize(address ctAddress) public view returns(uint256) {
+        return _marketData[ctAddress].appealers.size();
+    }
+    
+    function pushAppealersDeposit(address ctAddress, uint256 deposit)public onlyImpl {
+        _marketData[ctAddress].appealersDeposit.push(deposit);
+    }
+
+    // function setAppealersDeposit(address ctAddress, uint256 position, uint256 deposit)public onlyImpl  {
+    //     _marketData[ctAddress].appealersDeposit[position] = deposit;
+    // }
+
+    function clearAppealersDeposit(address ctAddress)public onlyImpl {
+        delete _marketData[ctAddress].appealerDeposit;
+    }
+
+    //addflaggers
+    function addAppealers(address ctAddress, address appealer)public onlyImpl  {
+        require(appealer != address(0));
+
+        _marketData[ctAddress].appealers.add(appealer);
+    }
+
+    function clearAppealers(address ctAddress)public onlyImpl{
+
+       _marketData[ctAddress].appealers.destroy();
+
+    }
+
+    function isAlreadyHaveAppealer(address ctAddress, address appealer) public view returns(bool) {
+        return _marketData[ctAddress].appealers.contains(appealer);
+    }
+
+    function appealerPostion(address ctAddress, address appealer)public view returns(uint256) {
+        return _marketData[ctAddress].appealers.position(appealer);
+    }
+
+    function addAppealersDeposit(address ctAddress, uint256 pos, uint256 depositAmount)public onlyImpl {
+        _marketData[ctAddress].appealersDeposit[pos - 1] = _marketData[ctAddress].appealersDeposit[pos - 1].add(depositAmount);
+    }
+    
+    function addAppealerDeposit(address ctAddress, uint256 depositAmount)public onlyImpl  {
+        _marketData[ctAddress].appealerDeposit = _marketData[ctAddress].appealerDeposit.add(depositAmount);
+    }
+
+    function appealDepositIsOk(address ctAddress)public view returns(bool){
+        return _marketData[ctAddress].appealerDeposit >= APPEALING_DEPOSIT_REQUIRED;
     }
 
   
@@ -231,9 +283,9 @@ contract SutStore is SutStoreConfig {
 
      */
 
-    function isFlaggingStart(address ctAddress)public view returns(bool){
-        return _marketData[ctAddress].flaggingStartedAt > 0;
-    }
+    // function isFlaggingStart(address ctAddress)public view returns(bool){
+    //     return _marketData[ctAddress].flaggingStartedAt > 0;
+    // }
 
     function isInFlaggingPeriod(address ctAddress)public view returns(bool){
         return _marketData[ctAddress].flaggingStartedAt > 0 && now - _marketData[ctAddress].flaggingStartedAt < FLAGGING_PERIOD;
@@ -248,14 +300,9 @@ contract SutStore is SutStoreConfig {
         MarketData storage marketData = _getMarketData(ctAddress);
         for (uint256 i = 0; i < marketData.flaggers.size(); ++i) {
 
-        SUT.transfer(marketData.flaggers.at(i), marketData.flaggersDeposit[i]);
+        coinStore.internalTransfer(SUT, marketData.flaggers.at(i), marketData.flaggersDeposit[i]);
 
         }
-    }
-
-    function deletFlaggerDeposit(address ctAddress)public onlyImpl {
-        MarketData storage marketData = _getMarketData(ctAddress);
-        delete marketData.flaggersDeposit;
     }
 
     function clearBallots(address ctAddress)public onlyImpl {
@@ -264,6 +311,10 @@ contract SutStore is SutStoreConfig {
 
     function clearFlaggerDeposit(address ctAddress)public onlyImpl {
         _marketData[ctAddress].flaggerDeposit = 0;
+    }
+
+    function clearAppealDeposit(address ctAddress) public onlyImpl {
+        _marketData[ctAddress].appealerDeposit = 0;
     }
 
     function setFlaggingStartedAt(address ctAddress, uint256 _time)public onlyImpl {
@@ -322,16 +373,13 @@ contract SutStore is SutStoreConfig {
         return _marketData[ctAddress].state == State.Voting;
     }
 
-
     function isInVotingPeriod(address ctAddress)public view returns(bool) {
         return now.sub(_marketData[ctAddress].votingStartedAt) <= VOTING_PERIOD;
     }
 
-
-    function _vote(address ctAddress, address voter, bool dissolve)public onlyImpl returns(uint8 _appealRound){
+    function vote(address ctAddress, address voter, bool dissolve)public onlyImpl returns(uint8 _appealRound){
 
         MarketData storage marketData = _getMarketData(ctAddress);
-
 
         // make sure it's the juror for current round
         uint256 pos = marketData.jurors.position(voter);
@@ -340,12 +388,10 @@ contract SutStore is SutStoreConfig {
 
 
         if (marketData.jurorVotes[pos - 1] == Vote.Abstain) {
-
             ++marketData.ballots;
-
         }
 
-        // should have been initialized
+        // should have been initialized true
         marketData.jurorVotes[pos - 1] = dissolve ? Vote.Aye : Vote.Nay;
 
         _appealRound = marketData.appealRound;
@@ -360,17 +406,14 @@ contract SutStore is SutStoreConfig {
         _marketData[ctAddress].ballots = 0;
     }
 
-    function addAppealDeposit(address ctAddress, uint256 _deposit)public onlyImpl{
-        _marketData[ctAddress].appealingDeposit += _deposit;
-    }
-
-
+    // function addAppealDeposit(address ctAddress, uint256 _deposit)public onlyImpl{
+    //     _marketData[ctAddress].appealerDeposit += _deposit;
+    // }
 
     //for conclude function
     function isBallotsFinish(address ctAddress)public view returns(bool){
         return  _marketData[ctAddress].ballots == JUROR_COUNT;
     }
-
 
     function countVote(address ctAddress)public onlyImpl view returns(uint8 _aye, uint8 _nay){
         MarketData storage marketData = _getMarketData(ctAddress);
@@ -415,18 +458,18 @@ contract SutStore is SutStoreConfig {
         uint256 count;
         Vote winningVote;
 
-        if (_ayeWin == false) {
+        if (_ayeWin == false){
             winningVote = Vote.Nay;
 
-        }else {
+        }else{
             winningVote = Vote.Aye;
         }
 
-        for (uint256 i = 0; i < marketData.jurorVotes.length; ++i) {
+        for (uint256 i = 0; i < marketData.jurorVotes.length; i++) {
 
             if (marketData.jurorVotes[i] == winningVote) {
 
-                ++count;
+                count++;
 
             }
 
@@ -434,14 +477,30 @@ contract SutStore is SutStoreConfig {
 
         uint256 amount = amountToDispense.div(count);
 
-        for (uint256 i = 0; i < marketData.jurorVotes.length; ++i) {
+        for (uint256 i = 0; i < marketData.jurorVotes.length; i++) {
 
             if (marketData.jurorVotes[i] == winningVote) {
 
-                SUT.transfer(marketData.jurors.at(i), amount);
+                //SUT.transfer(marketData.jurors.at(i), amount);
+                coinStore.internalTransfer(SUT,marketData.jurors.at(i),amount);
 
             }
 
+        }    
+
+    }
+
+
+    function dispens(address ctAddress, uint256 dispensAmount) public onlyImpl{
+        MarketData storage marketData = _getMarketData(ctAddress);
+
+        uint256 count = marketData.jurorVotes.length;
+
+        uint256 amount = dispensAmount.div(count);
+
+        for (uint256 i = 0; i < marketData.jurorVotes.length; ++i) {  
+                //SUT.transfer(marketData.jurors.at(i), amount);
+            coinStore.internalTransfer(SUT,marketData.jurors.at(i),amount);
         }    
 
     }
@@ -459,37 +518,42 @@ contract SutStore is SutStoreConfig {
     }
 
     function getAppealerDeposit(address ctAddress)public view returns(uint256){
-        return _marketData[ctAddress].appealingDeposit;
+        return _marketData[ctAddress].appealerDeposit;
     }
 
     function resetAppealerDeposit(address ctAddress)public onlyImpl{
-        _marketData[ctAddress].appealingDeposit = 0;
+        _marketData[ctAddress].appealerDeposit = 0;
     }
 
 
-    function refundDefaultAppealerDeposit(address ctAddress) public onlyImpl {
+    // function refundDefaultAppealerDeposit(address ctAddress) public onlyImpl {
 
-        require(_marketData[ctAddress].appealingDeposit >= APPEALING_DEPOSIT_REQUIRED);
+    //     require(_marketData[ctAddress].appealerDeposit >= APPEALING_DEPOSIT_REQUIRED);
 
-        SUT.transfer(_marketData[ctAddress].creator, APPEALING_DEPOSIT_REQUIRED);
+    //     //SUT.transfer(_marketData[ctAddress].creator, APPEALING_DEPOSIT_REQUIRED);
+    //     coinStore.internalTransfer(SUT,address(this),_marketData[ctAddress].creator,APPEALING_DEPOSIT_REQUIRED);
 
-        _marketData[ctAddress].appealingDeposit = _marketData[ctAddress].appealingDeposit.sub(APPEALING_DEPOSIT_REQUIRED);
+    //     _marketData[ctAddress].appealerDeposit = _marketData[ctAddress].appealerDeposit.sub(APPEALING_DEPOSIT_REQUIRED);
 
-    }
+    // }
 
     function refundAllAppealerDeposit(address ctAddress)public onlyImpl{
-        
-        uint256 _deposit = _marketData[ctAddress].appealingDeposit;
+        address[] memory _appealers = appealerList(ctAddress);
+        uint256[] memory _deposit =  _marketData[ctAddress].appealersDeposit;
+        //uint256 _deposit = _marketData[ctAddress].appealerDeposit;
 
-        SUT.transfer(_marketData[ctAddress].creator, _deposit);
+        require(_appealers.length == _deposit.length);
 
-        _marketData[ctAddress].appealingDeposit = 0;
+        for(uint256 i = 0; i < _appealers.length; i++) {
+            coinStore.internalTransfer(SUT,_appealers[i], _deposit[i]);
+        }
+
+        //SUT.transfer(_marketData[ctAddress].creator, _deposit);
     }
 
     function getInitalDeposit(address ctAddress)public view returns(uint256){
         return _marketData[ctAddress].initialDeposit;
     }
-
 
     function _getMarketData(address ctAddress) private view returns (MarketData storage) {
 
@@ -498,7 +562,6 @@ contract SutStore is SutStoreConfig {
         return _marketData[ctAddress];
 
     }
-
 
     //other function for view
     function creator(address ctAddress)public view returns(address){
@@ -524,13 +587,11 @@ contract SutStore is SutStoreConfig {
 
     }
 
-
     function flaggerList(address ctAddress) external view returns (address[] memory) {
 
         return _marketData[ctAddress].flaggers.list();
 
     }
-
 
     function flaggerDeposits(address ctAddress) external view returns (uint256[] memory) {
 
@@ -538,6 +599,28 @@ contract SutStore is SutStoreConfig {
 
     }
 
+    function appealerSize(address ctAddress) external view returns (uint256) {
+
+        return _marketData[ctAddress].appealers.size();
+
+    }
+
+
+    function appealerList(address ctAddress) public view returns (address[] memory) {
+
+        return _marketData[ctAddress].appealers.list();
+
+    }
+
+    function appealersDeposit(address ctAddress) external view returns (uint256[] memory) {
+
+        return _marketData[ctAddress].appealersDeposit;
+
+    }
+
+    function appealerTotalDeposit(address ctAddress) external view returns (uint256) {
+        return _marketData[ctAddress].appealerDeposit;
+    }
 
     function jurorSize(address ctAddress) external view returns (uint256) {
 
@@ -560,13 +643,13 @@ contract SutStore is SutStoreConfig {
     }
 
 
-    function totalCreatorDeposit(address ctAddress) external view returns (uint256) {
+    // function totalCreatorDeposit(address ctAddress) external view returns (uint256) {
 
-        MarketData storage marketData = _getMarketData(ctAddress);
+    //     MarketData storage marketData = _getMarketData(ctAddress);
 
-        return marketData.initialDeposit.add(marketData.appealingDeposit);
+    //     return marketData.initialDeposit.add(marketData.appealerDeposit);
 
-    }
+    // }
 
 
     function nextFlaggableDate(address ctAddress) external view returns (uint256) {
@@ -609,15 +692,51 @@ contract SutStore is SutStoreConfig {
 
     }
 
-
     function ballots(address ctAddress) external view returns (uint8) {
 
         return _marketData[ctAddress].ballots;
 
     }
 
-    function marketSize() external view returns (uint256) {
+    function setExchangeAvailable(address ctAddress, bool avilable) external onlyImpl {
+        _marketData[ctAddress].exchangeAvailable = avilable;
+    }
 
+    function isExchangeAvailable(address ctAddress) external view returns (bool) {
+        return _marketData[ctAddress].exchangeAvailable;
+    }
+
+    function setDissolveFee(address ctAddress, uint256 fee) external onlyImpl {
+        _marketData[ctAddress].dissolveFee = fee;
+    }
+
+    function getDissolveFee(address ctAddress) external view returns(uint256)  {
+        return _marketData[ctAddress].dissolveFee;
+    }
+
+    function setcConclusionFee(address ctAddress, uint256 fee) external onlyImpl {
+        _marketData[ctAddress].cConclusionFee = fee;
+    }
+
+    function setfConclusionFee(address ctAddress, uint256 fee) external onlyImpl {
+        _marketData[ctAddress].fConclusionFee = fee;
+    }
+
+    function getcConclusionFee(address ctAddress) public view returns (uint256) {
+        return _marketData[ctAddress].cConclusionFee;
+    }
+
+    function getfConclusionFee(address ctAddress) public view returns (uint256) {
+        return _marketData[ctAddress].fConclusionFee;
+    }
+
+    function refundFee(address ctAddress,address to, uint256 fee) external onlyImpl {
+        require(fee <= getfConclusionFee(ctAddress) + getcConclusionFee(ctAddress));
+
+        coinStore.internalTransfer(address(0), to, fee);
+    } 
+
+    function marketSize() external view returns (uint256) {
         return markets.length;
 
     }

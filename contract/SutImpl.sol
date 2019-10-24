@@ -4,9 +4,9 @@ import "./Ownable.sol";
 
 import "./CtMiddleware.sol";
 
-import "./SutProxy.sol";
+import "./ISutStoreInterface.sol";
 
-import "./SutStore.sol";
+import "./ISutProxy.sol";
 
 
 /**
@@ -16,51 +16,26 @@ import "./SutStore.sol";
  */
 
 
- interface CtMarket {
-    function isInFirstPeriod()external view returns(bool);
-
-
- }
-
-
 contract SutImpl is Ownable{
 
-    SutProxy public sutProxy;
+    ISutStore  sutStore;
+    ISutProxy  sutProxy;
+    CtMiddleware  ctMiddleware;
 
-    SutStore public sutStore;
+    constructor(address  _sutPorxy, address  _sutStore, address _ctMiddleware) public Ownable(msg.sender){
 
-    CtMiddleware public ctMiddleware;
+        sutProxy = ISutProxy(_sutPorxy);
+
+        sutStore = ISutStore(_sutStore);
+
+        ctMiddleware = CtMiddleware(_ctMiddleware);
+    }
 
     modifier onlyProxy() {
         require(msg.sender == address(sutProxy));
         _;
     }
-
-    modifier onlySutStore() {
-        require(msg.sender == address(sutStore));
-
-        _;
-
-    }
-
-    constructor(address payable _sutPorxy, address payable _sutStore, address _ctMiddleware) public Ownable(msg.sender){
-
-        sutProxy = SutProxy(_sutPorxy);
-
-        sutStore = SutStore(_sutStore);
-
-        ctMiddleware = CtMiddleware(_ctMiddleware);
-    }
     
-
-
-    // we're not supposed to accept ETH?
-
-    function() payable external {
-
-        revert();
-
-    }
 
     function setCtMiddleware(address _middleware)public onlyOwner {
         require(_middleware != address(0));
@@ -69,45 +44,38 @@ contract SutImpl is Ownable{
     }
 
     
-    function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime) external onlyProxy returns(address){
+    function _newCtMarket(address marketCreator, uint256 initialDeposit, string calldata _name, string calldata _symbol, uint256 _supply, uint256 _rate, uint256 _lastRate, uint256 _closingTime, uint256 cfee, uint256 dfee) external onlyProxy returns(address){
         
         address ctAddress = ctMiddleware.newCtMarket(marketCreator,_name,_symbol,_supply,_rate, _lastRate,_closingTime);
 
-        sutStore.setCtMarketCreator(ctAddress,marketCreator);
-        sutStore.activeCtMarket(ctAddress);
-        sutStore.setInitDeposit(ctAddress,initialDeposit);
-        sutStore.setLastFlaggingConclude(ctAddress, now);
-        sutStore.pushCtMarket(ctAddress);
-        
-        sutProxy.emitMarketCreated(ctAddress, marketCreator, initialDeposit);
+        setNewCtMarket(ctAddress,marketCreator,initialDeposit,cfee,dfee);
 
         return ctAddress;
     }
 
+    function setNewCtMarket(address ctAddress, address marketCreator, uint256 initialDeposit, uint256 cfee, uint256 dfee) private {
+        
+        sutStore.setCtMarketCreator(ctAddress,marketCreator);
+        
+        sutStore.activeCtMarket(ctAddress);
 
-    /**********************************************************************************
+        sutStore.setExchangeAvailable(ctAddress, true);
 
-     *                                                                                *
+        sutStore.setInitDeposit(ctAddress,initialDeposit);
 
-     * first period buy                                                                   *
+        sutStore.setLastFlaggingConclude(ctAddress, now);
 
-     *                                                                                *
+        sutStore.pushCtMarket(ctAddress);
 
-     **********************************************************************************/
-    // function _addHolder(address _ctAddress, address _holder)public onlyProxy{
-    //     ctMiddleware.addHolder(_ctAddress, _holder);
-    // }
+        sutStore.setcConclusionFee(ctAddress,cfee);
 
-    // function _removeHolder(address _ctAddress, address _holder)public onlyProxy{
-    //     ctMiddleware.removeHolder(_ctAddress, _holder);
-    // }
+        sutStore.setDissolveFee(ctAddress,dfee);
+        
+        sutProxy.emitMarketCreated(ctAddress, marketCreator, initialDeposit);
+    }
     
-    // function _finishCtFirstPeriod(address _ctAddress)public onlyProxy{
-    //     ctMiddleware.finishCtFirstPeriod(_ctAddress);
-    // }
     
-
-
+    
     /**********************************************************************************
 
      *                                                                                *
@@ -118,13 +86,16 @@ contract SutImpl is Ownable{
 
      **********************************************************************************/
 
-    function _flagMarket(address ctAddress, address flagger, uint256 depositAmount) public onlyProxy {
-        require(sutStore.checkAddress(flagger));       
+    function _flagMarket(address ctAddress, address flagger, uint256 depositAmount, uint256 fee) public onlyProxy {
+        require(sutStore.checkAddress(flagger));
         require(sutStore.isCtMarketActive(ctAddress));
         require(sutStore.ableFlagCtMarket(ctAddress));
 
         if (sutStore.flaggingNotStarted(ctAddress)) {
+
             sutStore.setFlaggingStartedTime(ctAddress,now);
+            sutStore.setfConclusionFee(ctAddress,fee);
+
         }else {
             require(sutStore.isInFlagging(ctAddress,now));
         }
@@ -133,7 +104,7 @@ contract SutImpl is Ownable{
             uint256 pos = sutStore.flagerPostion(ctAddress,flagger);
             sutStore.addFlaggersDeposit(ctAddress,pos,depositAmount);
         }else{
-            sutStore.addFlager(ctAddress,flagger);
+            sutStore.addFlaggers(ctAddress,flagger);
             sutStore.pushFlagerDeposit(ctAddress,depositAmount);
         }
 
@@ -147,8 +118,6 @@ contract SutImpl is Ownable{
         }
         
         uint256 totoalDeposit = sutStore.getFlaggerDeposit(ctAddress);
-        
-        //uint256 totoalDeposit = depositAmount;
 
         sutProxy.emitFlagging(ctAddress, flagger, depositAmount, totoalDeposit);
 
@@ -164,26 +133,79 @@ contract SutImpl is Ownable{
 
     function _closeFlagging(address ctAddress, address sutplayer)public onlyProxy{
         require(sutStore.isCtMarketActive(ctAddress));
+
         require(!sutStore.isInFlaggingPeriod(ctAddress));
+
         require(sutStore.isFlaggerDepositHave(ctAddress));
         
         sutStore.refundFlaggerDeposit(ctAddress);
+
+        uint256 fee = sutStore.getfConclusionFee(ctAddress);
+
+        sutStore.refundFee(ctAddress,sutplayer,fee);
+
+        sutStore.setfConclusionFee(ctAddress,0);
+
         sutStore.clearFlagger(ctAddress);
+
         sutStore.clearCtFlaggersDeposit(ctAddress);
-        sutStore.clearBallots(ctAddress);
+
         sutStore.clearFlaggerDeposit(ctAddress);
+
         sutStore.setFlaggingStartedAt(ctAddress,0);
+
         sutStore.setLastFlaggingConcluded(ctAddress,now);
         
         sutProxy.emitCloseFlagging(ctAddress, sutplayer);
     }
 
+    function _closeAppealing(address ctAddress, address closer) public onlyProxy {
+        
+        (uint256 start, uint256 end) = _appealingPeriod(ctAddress);
+        require(start != end && now > end);
+        require(!sutStore.appealDepositIsOk(ctAddress));
+
+        sutStore.refundAllAppealerDeposit(ctAddress);
+
+        uint256 fee = sutStore.getcConclusionFee(ctAddress);
+        sutStore.refundFee(ctAddress,closer,fee);
+
+        sutStore.setcConclusionFee(ctAddress,0);
+
+        sutStore.clearAppealers(ctAddress);
+
+        sutStore.clearAppealersDeposit(ctAddress);
+
+        if (sutStore.getMarketAppealRound(ctAddress) == 2) {
+            sutStore.setAppealStart(ctAddress,now);
+            sutStore.pendindDissolveCtMarket(ctAddress);
+        }else if(sutStore.getMarketAppealRound(ctAddress) == 3) {
+            uint256 fFee = sutStore.getfConclusionFee(ctAddress);
+            
+            sutStore.refundFee(ctAddress,firstFlager(ctAddress),fFee);
+
+            sutStore.setfConclusionFee(ctAddress,0);
+            
+            sutStore.refundFlaggerDeposit(ctAddress);
+            sutStore.dissolvedCtMarket(ctAddress);
+            
+            //TODO
+            ctMiddleware.trunDissolved(ctAddress);
+
+
+        }else{
+            revert();
+        }
+    }
+
 
     function _vote(address ctAddress, address voter, bool dissolve)public onlyProxy{
+
         require(sutStore.isMarketStateVoting(ctAddress));
+
         require(sutStore.isInVotingPeriod(ctAddress));
 
-        uint8 round = sutStore._vote(ctAddress, voter,dissolve);
+        uint8 round = sutStore.vote(ctAddress, voter,dissolve);
 
         sutProxy.emitMaketVote(ctAddress,voter,round,dissolve);
     }
@@ -198,248 +220,295 @@ contract SutImpl is Ownable{
      */
 
     //appeal market
-    function _applealMarket(address ctAddress, address appealer, uint256 depositAmount)public onlyProxy {
-        require(sutStore.creator(ctAddress) == appealer);
+
+    function _appealerSize(address ctAddress) public view onlyProxy returns(uint256) {
+        return sutStore.getAppealersSize(ctAddress);
+    }
+
+    function _applealMarket(address ctAddress, address appealer, uint256 cfee, uint256 depositAmount)public onlyProxy {
         require(sutStore.isMarketPenddingDissolve(ctAddress));
 
-        sutStore._drawJurors(ctAddress,appealer);
-        sutStore.addMarketAppealRound(ctAddress);
-        sutStore.votingCtMarket(ctAddress);
-        sutStore.setVotingStartedAt(ctAddress,now);
+        (uint256 start, uint256 end) = sutStore.appealingPeriod(ctAddress);
+        require(now > start && now <= end);
 
-        sutStore.resetMarketBallots(ctAddress);
-        sutStore.addAppealDeposit(ctAddress,depositAmount);
+        if(cfee > 0) {
+            sutStore.setcConclusionFee(ctAddress,cfee);
+        }
 
-        sutProxy.emitAppealMarket(ctAddress,appealer,depositAmount);
+        if (sutStore.isAlreadyHaveAppealer(ctAddress, appealer)) {
+            uint256 pos = sutStore.appealerPostion(ctAddress,appealer);
+
+            sutStore.addAppealersDeposit(ctAddress,pos,depositAmount);
+        }else{
+            sutStore.addAppealers(ctAddress,appealer);
+            sutStore.pushAppealersDeposit(ctAddress,depositAmount);
+        }
+
+        sutStore.addAppealerDeposit(ctAddress,depositAmount);
+
+        if( sutStore.appealDepositIsOk(ctAddress)) {
+
+            sutStore._drawJurors(ctAddress,appealer);
+            sutStore.addMarketAppealRound(ctAddress);
+            sutStore.votingCtMarket(ctAddress);
+            sutStore.setVotingStartedAt(ctAddress,now);
+            sutStore.resetMarketBallots(ctAddress);
+
+            sutProxy.emitAppealMarket(ctAddress,appealer,depositAmount);
+        }
+
     }
 
 
-
+    //sutStore.refundAllAppealerDeposit(ctAddress);
     //conclude
-    function _concludeMarket(address ctAddress)public onlyProxy {
+    function _concludeMarket(address ctAddress,address concluder)public onlyProxy {
         require(sutStore.isMarketStateVoting(ctAddress));
         require(sutStore.isBallotsFinish(ctAddress) || !sutStore.isInVotingPeriod(ctAddress));
 
         (uint8 aye, uint8 nay) = sutStore.countVote(ctAddress);
 
         uint8 round = sutStore.getMarketAppealRound(ctAddress);
+
+        uint256 ffee = sutStore.getfConclusionFee(ctAddress);
+        uint256 cfee = sutStore.getcConclusionFee(ctAddress);
+        uint256 flagerDeposit = sutStore.getFlaggerDeposit(ctAddress);
+        uint256 appealDeposit = sutStore.getAppealerDeposit(ctAddress);
         
         // first round of voting
         if (round == 1){
 
             // @dev 投票成功，等待appeal的结果
-            if (sutStore.isGthMinballots(ctAddress) && aye > nay) {
-                sutStore.pendindDissolveCtMarket(ctAddress);
-                sutStore.setAppealStart(ctAddress,now);
+            if (sutStore.isGthMinballots(ctAddress)) {
 
-            }else{
-                if (!sutStore.isGthMinballots(ctAddress)){
-                    // @dev 不够人投票，等同于flag没发生
-                    sutStore.refundFlaggerDeposit(ctAddress);
+                if(aye > nay){
+                sutStore.setExchangeAvailable(ctAddress, false);
+
+                sutStore.refundFee(ctAddress,concluder,cfee);
+
+                flagSuccess(ctAddress);
+
+                sutStore.dispenseDeposit(ctAddress,sutStore.getInitalDeposit(ctAddress),true);
+                
+                sutStore.setInitDeposit(ctAddress,0);
+
                 }else{
+                sutStore.refundFee(ctAddress,concluder,ffee);
+                sutStore.setfConclusionFee(ctAddress,0);
 
-                     // @dev 平手或者反对者更多，flagger的抵押被瓜分
-                    uint256 _dispense = sutStore.getFlaggerDeposit(ctAddress);
-                    sutStore.dispenseDeposit(ctAddress, _dispense,false);
+                sutStore.dispenseDeposit(ctAddress, flagerDeposit,false);
+
+                flagFailed(ctAddress);
                 }
+            }else{
+                sutStore.refundFee(ctAddress,concluder,ffee);
+                sutStore.setfConclusionFee(ctAddress,0);
+               
+                    // @dev 不够人投票，等同于flag没发生
+                    if(sutStore.ballots(ctAddress) == 0){
+                        sutStore.refundFlaggerDeposit(ctAddress);
+                    }else{
+                        sutStore.dispens(ctAddress,flagerDeposit);
+                    }
+                
 
-                sutStore.activeCtMarket(ctAddress);
-                sutStore.clearFlagger(ctAddress);
-                sutStore.clearCtFlaggersDeposit(ctAddress);
-                sutStore.clearBallots(ctAddress);
-                sutStore.clearFlaggerDeposit(ctAddress);
-                sutStore.setFlaggingStartedAt(ctAddress,0);
-                sutStore.setLastFlaggingConcluded(ctAddress,now);
-                sutStore.destroyJurors(ctAddress);
-                sutStore.deleteJurorVoters(ctAddress);
-                sutStore.resetAppealRound(ctAddress);
-                sutStore.setAppealStart(ctAddress,0);
+                flagFailed(ctAddress);
             }
 
 
         }else if(round == 2){
-            if (!sutStore.isGthMinballots(ctAddress)){
 
-                sutStore.refundDefaultAppealerDeposit(ctAddress);
-                sutStore.pendindDissolveCtMarket(ctAddress);
-                sutStore.setAppealStart(ctAddress,now);
+            if(sutStore.isGthMinballots(ctAddress)){
+                if(aye <= nay){
 
-            }else if(aye <= nay){
-                uint256 _dispense = sutStore.getFlaggerDeposit(ctAddress);
-                sutStore.dispenseDeposit(ctAddress, _dispense, false);
-                sutStore.refundDefaultAppealerDeposit(ctAddress);
-                sutStore.resetAppealerDeposit(ctAddress);
-                sutStore.activeCtMarket(ctAddress);
+                    sutStore.dispenseDeposit(ctAddress, flagerDeposit, false);
+                    sutStore.refundAllAppealerDeposit(ctAddress);
 
-                sutStore.clearFlagger(ctAddress);
-                sutStore.clearCtFlaggersDeposit(ctAddress);
-                sutStore.clearBallots(ctAddress);
-                sutStore.clearFlaggerDeposit(ctAddress);
-                sutStore.setFlaggingStartedAt(ctAddress,0);
-                sutStore.setLastFlaggingConcluded(ctAddress,now);
-                sutStore.destroyJurors(ctAddress);
-                sutStore.deleteJurorVoters(ctAddress);
-                sutStore.resetAppealRound(ctAddress);
-                sutStore.setAppealStart(ctAddress,0);
+                    flagFailed(ctAddress);
+                    sutStore.refundFee(ctAddress,concluder,ffee);
+                    sutStore.setfConclusionFee(ctAddress,0);
+                    sutStore.setExchangeAvailable(ctAddress, true);
 
+                }else{
+
+                    sutStore.dispenseDeposit(ctAddress, appealDeposit, true);
+                    sutStore.refundFee(ctAddress,concluder,ffee);
+                    flagSuccess(ctAddress);
+
+                }
             }else{
-                sutStore.pendindDissolveCtMarket(ctAddress);
-                sutStore.setAppealStart(ctAddress,now);
+
+                if(sutStore.ballots(ctAddress) == 0){
+                    sutStore.refundAllAppealerDeposit(ctAddress);
+                }else{
+                    sutStore.dispens(ctAddress,appealDeposit);
+                }
+                
+                sutStore.refundFee(ctAddress,concluder,ffee);
+                flagSuccess(ctAddress);
 
             }
+
+            clearAppeals(ctAddress);
         }else if (round == 3){
-            if (!sutStore.isGthMinballots(ctAddress)){
 
-                sutStore.refundDefaultAppealerDeposit(ctAddress);
+            if(sutStore.isGthMinballots(ctAddress)){
+                if(aye <= nay){
+                    sutStore.dispenseDeposit(ctAddress, flagerDeposit, false); 
 
-                sutStore.refundFlaggerDeposit(ctAddress);
+                    sutStore.refundAllAppealerDeposit(ctAddress);
 
-                uint256 _dispense = sutStore.getInitalDeposit(ctAddress);
-                _dispense += sutStore.getAppealerDeposit(ctAddress);
+                    flagFailed(ctAddress);
 
-                sutStore.dispenseDeposit(ctAddress,_dispense,true);
+                    sutStore.setExchangeAvailable(ctAddress, true);
 
-                sutStore.resetAppealerDeposit(ctAddress);
+                    sutStore.refundFee(ctAddress,concluder,ffee);
+                    sutStore.setfConclusionFee(ctAddress,0);
+                    sutStore.refundFee(ctAddress,firstApperler(ctAddress),cfee);
+                    sutStore.setcConclusionFee(ctAddress,0);
+                   
+                }else{
+                    sutStore.refundFlaggerDeposit(ctAddress);
 
-                sutStore.setInitDeposit(ctAddress,0);
+                    sutStore.dispenseDeposit(ctAddress,appealDeposit,true); 
 
-                sutStore.dissolvedCtMarket(ctAddress);
+                    sutStore.dissolvedCtMarket(ctAddress);
 
-                //TODO
-                ctMiddleware.trunDissolved(ctAddress);
-            }else if (aye <= nay){
-                uint256 _dispense = sutStore.getFlaggerDeposit(ctAddress);
-                sutStore.dispenseDeposit(ctAddress, _dispense, false);
+                    sutStore.refundFee(ctAddress,concluder,cfee);
 
-                sutStore.refundAllAppealerDeposit(ctAddress);
-                sutStore.resetAppealerDeposit(ctAddress);
-                sutStore.activeCtMarket(ctAddress);
+                    sutStore.setcConclusionFee(ctAddress,0);
 
-                sutStore.clearFlagger(ctAddress);
-                sutStore.clearCtFlaggersDeposit(ctAddress);
-                sutStore.clearBallots(ctAddress);
-                sutStore.clearFlaggerDeposit(ctAddress);
-                sutStore.setFlaggingStartedAt(ctAddress,0);
-                sutStore.setLastFlaggingConcluded(ctAddress,now);
-                sutStore.destroyJurors(ctAddress);
-                sutStore.deleteJurorVoters(ctAddress);
-                sutStore.resetAppealRound(ctAddress);
-                sutStore.setAppealStart(ctAddress,0);
+                    sutStore.refundFee(ctAddress,firstFlager(ctAddress),ffee);
+
+                    sutStore.setfConclusionFee(ctAddress,0);
+
+                    //TODO
+                    ctMiddleware.trunDissolved(ctAddress);
+                }
+
             }else{
+                if(sutStore.ballots(ctAddress) == 0) {
+                    sutStore.refundAllAppealerDeposit(ctAddress);
+                }else {
+                    sutStore.dispens(ctAddress,appealDeposit);
+                }
 
                 sutStore.refundFlaggerDeposit(ctAddress);
 
-                uint256 _dispense = sutStore.totalCreatorDeposit(ctAddress);
-                               
-                sutStore.dispenseDeposit(ctAddress,_dispense,true);
-
-                sutStore.resetAppealerDeposit(ctAddress);
-
-                sutStore.setInitDeposit(ctAddress,0);
-
                 sutStore.dissolvedCtMarket(ctAddress);
+
+                sutStore.refundFee(ctAddress,concluder,cfee);
+                sutStore.setcConclusionFee(ctAddress,0);
+
+                sutStore.refundFee(ctAddress,firstFlager(ctAddress),ffee);
 
                 //TODO
                 ctMiddleware.trunDissolved(ctAddress);
-
             }
+
+            clearAppeals(ctAddress);
         }else {
 
             revert();
 
-        }
+        } 
+    }
+    
 
-        
+    function flagFailed(address ctAddress) private {
+
+                sutStore.activeCtMarket(ctAddress);
+                sutStore.clearFlagger(ctAddress);
+                sutStore.clearCtFlaggersDeposit(ctAddress);
+                sutStore.clearBallots(ctAddress);
+                sutStore.clearFlaggerDeposit(ctAddress);
+                sutStore.setFlaggingStartedAt(ctAddress,0);
+                sutStore.setLastFlaggingConcluded(ctAddress,now);
+                sutStore.destroyJurors(ctAddress);
+                sutStore.deleteJurorVoters(ctAddress);
+                sutStore.resetAppealRound(ctAddress);
+                sutStore.setAppealStart(ctAddress,0);
     }
 
-    function _prepareDissovle(address _ctAddress)public onlyProxy{
-        require(sutStore.state(_ctAddress) == 2);
+    function flagSuccess(address ctAddress) private {
+        sutStore.pendindDissolveCtMarket(ctAddress);
+        sutStore.setAppealStart(ctAddress,now);
+        sutStore.setcConclusionFee(ctAddress,0);
 
-        (uint256 _start, uint256 _end) = sutStore.appealingPeriod(_ctAddress);
+    }
+
+
+    function clearAppeals(address ctAddress) private {
+            sutStore.clearAppealers(ctAddress);
+            sutStore.clearAppealersDeposit(ctAddress);
+            sutStore.resetAppealerDeposit(ctAddress);
+    }
+
+
+    function _prepareDissovle(address ctAddress, address doner)public onlyProxy{
+        require(sutStore.state(ctAddress) == 2);
+
+        (uint256 _start, uint256 _end) = sutStore.appealingPeriod(ctAddress);
 
         require(_start != 0 && now > _end);
 
-        ctMiddleware.trunDissolved(_ctAddress);
+        uint256 fee = sutStore.getDissolveFee(ctAddress);
+
+        uint256 ffee = sutStore.getfConclusionFee(ctAddress);
+
+        sutStore.refundFee(ctAddress,doner,fee);
+
+        sutStore.refundFee(ctAddress,firstFlager(ctAddress),ffee);
+
+        sutStore.refundFlaggerDeposit(ctAddress);
+
+        sutStore.clearFlagger(ctAddress);
+        sutStore.clearCtFlaggersDeposit(ctAddress);
+        sutStore.clearBallots(ctAddress);
+        sutStore.clearFlaggerDeposit(ctAddress);
+        sutStore.setDissolveFee(ctAddress,0);
+        sutStore.setfConclusionFee(ctAddress,0);
+        ctMiddleware.trunDissolved(ctAddress);
 
     }
 
-    // function _dissolve(address _ctAddress)public onlyProxy{
-    //     require(sutStore.state(_ctAddress) == 3);
+    function notSellOutDissovle(address ctAddress, address doner) public onlyProxy {
+        uint256 fee = sutStore.getDissolveFee(ctAddress);
+        uint256 cfee = sutStore.getcConclusionFee(ctAddress);
 
-    //     ctMiddleware.dissolve(_ctAddress);
+        sutStore.refundFee(ctAddress,doner,fee);
+        sutStore.refundFee(ctAddress,_creator(ctAddress),cfee);
+        sutStore.setDissolveFee(ctAddress,0);
+        sutStore.setcConclusionFee(ctAddress,0);
 
-    //     sutProxy.emitDissolvedCtMarket(_ctAddress);
+        ctMiddleware.trunDissolvedByNotSellOut(ctAddress);
+    }
 
-    // }
+    function _upgradeMarket(address ctAddress)external onlyProxy{
+        uint256 cfee = sutStore.getcConclusionFee(ctAddress);
+        uint256 fee = sutStore.getDissolveFee(ctAddress);
+        sutStore.refundFee(ctAddress,_creator(ctAddress),cfee + fee);
 
+        sutStore.setDissolveFee(ctAddress,0);
+        sutStore.setcConclusionFee(ctAddress,0);
+    }
 
-    //other function for view 
+    // //other function for view 
     function _creator(address ctAddress)public view returns(address){
         return sutStore.creator(ctAddress);
     }
 
-    function _state(address ctAddress)public view returns(uint8){
-        return sutStore.state(ctAddress);
+    function firstFlager(address ctAddress) public view returns(address) {
+        return sutStore.flaggerList(ctAddress)[0];
     }
 
-    function _flaggerSize(address ctAddress)public view returns(uint256){
-        return sutStore.flaggerSize(ctAddress);
-    }
-
-    function _flaggerList(address ctAddress)public view returns(address[] memory) {
-        return sutStore.flaggerList(ctAddress);
+    function firstApperler(address ctAddress) public view returns(address) {
+        return sutStore.appealerList(ctAddress)[0];
     }
     
-
-    function _flaggerDeposits(address ctAddress)public view returns(uint256[] memory) {
-        return sutStore.flaggerDeposits(ctAddress);
-    }
-
-    function _jurorSize(address ctAddress)public view returns(uint256) {
-        return sutStore.jurorSize(ctAddress);
-    }
-
-    
-    function _jurorList(address ctAddress)public view returns(address[] memory) {
-        return sutStore.jurorList(ctAddress);
-    }
-
-    function _totalFlaggerDeposit(address ctAddress)public view returns(uint256){
-        return sutStore.getFlaggerDeposit(ctAddress);
-    }
-
-    function _totalCreatorDeposit(address ctAddress)public view returns(uint256){
-        return sutStore.totalCreatorDeposit(ctAddress);
-    }
-
-
-    function _nextFlaggableDate(address ctAddress)public view returns(uint256){
-        return sutStore.nextFlaggableDate(ctAddress);
-    }
-
-    function _flaggingPeriod(address ctAddress)public view returns(uint256 start, uint256 end){
-        (start, end) = sutStore.flaggingPeriod(ctAddress);
-    }
- 
-    function _votingPeriod(address ctAddress)public view returns(uint256 start, uint256 end){
-        (start, end) = sutStore.votingPeriod(ctAddress);
-    }
 
     function _appealingPeriod(address ctAddress)public view returns(uint256 start, uint256 end){
         (start, end) = sutStore.appealingPeriod(ctAddress);
     }
-
-    function _appealRound(address ctAddress)public view returns(uint8){
-        return sutStore.appealRound(ctAddress);
-    }
-
-    function _ballots(address ctAddress)public view returns(uint8){
-        return sutStore.ballots(ctAddress);
-    }
-
-    function _marketSize()public view returns(uint256){
-        return sutStore.marketSize();
-    }
-
  
 }

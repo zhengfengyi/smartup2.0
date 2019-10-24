@@ -3,6 +3,9 @@ pragma solidity >=0.4.21 <0.6.0;
 import "./SafeMath.sol";
 import "./IterableSet.sol";
 import "./Ownable.sol";
+import "./ICoinStore.sol";
+import "./Ecrecovery.sol";
+import "./IAdmin.sol";
 
 
 interface Token {
@@ -41,11 +44,8 @@ interface ISutStore {
     function creator(address ctAddress)external view returns(address);
 }
 
-interface Exchange {
-    function balanceOf(address marketAddress, address owner)external view returns(uint256);
-}
 
-contract CtProposal is Ownable{
+contract CtProposal is Ownable, Ecrecovery{
 
     using IterableSet for IterableSet.AddressSet;
     using SafeMath for uint256;
@@ -59,13 +59,20 @@ contract CtProposal is Ownable{
         uint256[] reward;
         uint256[] deadline;
         address[] rewardCoin;
-        address payable[] beneficiary;
+        address[] beneficiary;
         uint256[] vote;
+        uint256 fee;
         mapping(uint8 => address[]) votedetails;
     }
 
-    uint256 public proposalCount = 0;
+    uint8 public ADMIN_NUMBER_KEY = 2;
+    uint256 public proposalCount = 1;
+    uint256 ONE_MILESTONE_FEE = 0.01 ether;
+
     address public SUT;
+    address public feeAccount;
+    address public exchange;
+    address public marketOpration;
     
     bool public stopFlag;
     
@@ -76,23 +83,27 @@ contract CtProposal is Ownable{
     mapping(address => mapping(uint256 => mapping(uint8 => bool)))private isVote;
     mapping(address => mapping(address => uint256)) public marketCurrentReward;
     mapping(address => mapping(address => bool)) public isWithdraw;
+    mapping(bytes32 => bool) public expireHash;
 
     ISutStore sutStore;
-    Exchange  ex;
+    ICoinStore coinStore;
+    IAdmin admin;
    
     event RecivedDonate(address marketAddress, address donator, address tokenAddress, uint256 value);
     event NewProposal(uint256 _proposalCount, address _marketAddress, address _creator);
+    event ModifierProposal(uint256 _proposalId);
+    event TransferProposal(uint256 _proposalId, address _rawOwner, address _newOwner);
+    event VoteForPropsoal(address _vote, uint256 _proposalId, uint8 _stage);
     
 
-    constructor (address _sutStore, address _owner, address _sutToken) public Ownable(_owner){
+    constructor (address _sutStore, address _owner, address _sutToken, address _feeAccount, address _admin, address _exchange, address _opration) public Ownable(_owner){
         sutStore = ISutStore(_sutStore);
         SUT = _sutToken;
+        feeAccount = _feeAccount;
+        admin = IAdmin(_admin);
+        exchange = _exchange;
+        marketOpration = _opration;
     }
-
-    function ()external payable{
-
-    }
-
 
     modifier onlyStart() {
         require(stopFlag == false);
@@ -110,8 +121,8 @@ contract CtProposal is Ownable{
         stopFlag = false;
     }
 
-    function setExchange(address _exchange) public onlyOwner {
-        ex = Exchange(_exchange);
+    function setCoinStore(address _coinStore) public onlyOwner {
+        coinStore = ICoinStore(_coinStore);
     }
 
 /**********************************************************************************
@@ -123,77 +134,47 @@ contract CtProposal is Ownable{
 *                                                                                *
 
 **********************************************************************************/
-function receiveApproval(address _owner, uint256 approvedAmount, address token, bytes calldata extraData) external{
-    require(_owner != address(0));
-    require(approvedAmount > 0);
-    require(token !=  address(0));
-
-    address market = bytesToAddress(extraData);
-
-    require(!CtStore(market).dissolved());
-    require(sutStore.creator(market) != address(0));
-    require(CtStore(market).migrationTarget() == address(0));
-
-    require(Token(token).transferFrom(_owner, address(this), approvedAmount));
-
-
-    marketTokenBalance[market][token] = marketTokenBalance[market][token].add(approvedAmount);
-    donateInfo[market][market][market] = donateInfo[market][market][market].add(approvedAmount);
-
-}
-
-function bytesToAddress(bytes memory bys) internal pure returns (address addr) {
-    assembly {
-      addr := mload(add(bys,20))
-    } 
-}
-
-function toBytes(address a) internal pure returns (bytes memory b){
-    assembly {
-        let m := mload(0x40)
-        a := and(a, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-        mstore(add(m, 20), xor(0x140000000000000000000000000000000000000000, a))
-        mstore(0x40, add(m, 52))
-        b := m
-    }
-}
-
-
-function donateETH(address marketAddress)public onlyStart payable{
-    require(msg.value > 0);
+function donateCoinToProposal(address _token, address _donator, address _marketAddress, uint256 _value, uint256 _fee, uint256 timeStamp, bytes memory sign) public {
+    require(admin.onlyAdmin(msg.sender));
     
-    require(!CtStore(marketAddress).dissolved());
-    require(sutStore.creator(marketAddress) != address(0));
-    require(CtStore(marketAddress).migrationTarget() == address(0));
+    bytes32 signHash = keccak256(abi.encodePacked(_token, _donator, _marketAddress, _value, _fee,timeStamp)); 
 
-    if(marketTokenBalance[marketAddress][address(0)] == 0){
-        marketRecived[marketAddress].add(address(0));
+    require(ecrecovery(signHash, sign) == _donator);
+
+    require(!expireHash[signHash]);
+
+    require(!CtStore(_marketAddress).dissolved());
+    require(sutStore.creator(_marketAddress) != address(0));
+    require(CtStore(_marketAddress).migrationTarget() == address(0));
+
+    if(marketTokenBalance[_marketAddress][address(0)] == 0){
+        marketRecived[_marketAddress].add(address(0));
     }
 
-    marketTokenBalance[marketAddress][address(0)] = marketTokenBalance[marketAddress][address(0)].add(msg.value);
-    donateInfo[msg.sender][marketAddress][address(0)] = donateInfo[msg.sender][marketAddress][address(0)].add(msg.value);
+    coinStore.internalTransferFrom(_token, _donator, address(this), _value);
+    coinStore.internalTransferFrom(address(0), _donator, feeAccount, _fee);
 
-    emit RecivedDonate(marketAddress, msg.sender, address(0), msg.value);
+    marketTokenBalance[_marketAddress][address(0)] = marketTokenBalance[_marketAddress][address(0)].add(_value);
+    donateInfo[_donator][_marketAddress][address(0)] = donateInfo[_donator][_marketAddress][address(0)].add(_value);
+
+    expireHash[signHash] = true;
+
+    emit RecivedDonate(_marketAddress,_donator, address(0), _value);
 }
 
-function donateERC20(address marketAddress, address erc20Address, uint256 value) public onlyStart{
-    require(value > 0);
-    require(!CtStore(marketAddress).dissolved());
-    require(sutStore.creator(marketAddress) != address(0));
-    require(CtStore(marketAddress).migrationTarget() == address(0));
+   function recivedSut(address sut, address _marketAddress, uint256 amount) public {
+       require(msg.sender == exchange);
 
+       marketTokenBalance[_marketAddress][sut] = marketTokenBalance[_marketAddress][sut].add(amount);
+       
+       marketRecived[_marketAddress].add(sut);
+   }
 
-    if (marketTokenBalance[marketAddress][erc20Address] == 0) {
-        marketRecived[marketAddress].add(marketAddress);
-    }
+   function withdrawToMarket(address token, address marketAddress, uint256 amount) public {
+       require(msg.sender == marketOpration);
 
-    require(Token(erc20Address).transferFrom(msg.sender,address(this),value));
-
-    marketTokenBalance[marketAddress][erc20Address] = marketTokenBalance[marketAddress][erc20Address].add(value);
-    donateInfo[msg.sender][marketAddress][erc20Address] = donateInfo[msg.sender][marketAddress][erc20Address].add(value);
-
-    emit RecivedDonate(marketAddress, msg.sender, erc20Address, value);
-}
+       coinStore.internalTransfer(token,marketAddress,amount);
+   }
 
 /**********************************************************************************
 
@@ -216,11 +197,20 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
     }                                                     *
 
 **********************************************************************************/
-   function newProposal(uint8 _milestone, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory _beneficiary)public  onlyStart{
+   function newProposal(uint8 _milestone, address _creator, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address[] memory _beneficiary, uint256 fee, uint256 proposalFee, uint256 timeStamp, bytes memory sign)public onlyStart{
+       require(admin.onlyAdmin(msg.sender));
+
+       bytes32 signHash = keccak256(abi.encodePacked(_milestone, _creator, _marketAddress, fee, proposalFee,timeStamp)); 
+
+       require(ecrecovery(signHash, sign) == _creator);
+
+       require(!expireHash[signHash]);
+       
        require(sutStore.creator(_marketAddress) != address(0));
-       require(CtStore(_marketAddress).containsHolder(msg.sender));
+       require(CtStore(_marketAddress).containsHolder(_creator));
        require(!CtStore(_marketAddress).dissolved());
        require(CtStore(_marketAddress).migrationTarget() == address(0));
+       require(proposalFee >= ONE_MILESTONE_FEE * _milestone);
        
        require(_milestone == _reward.length);
        require(_milestone == _deadline.length);
@@ -231,15 +221,21 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
 
        uint256[] memory _vote = new uint256[](_milestone);
 
-       proposals[proposalCount] = Proposal(true, _marketAddress, msg.sender, 0, _milestone, _reward, _deadline, _rewardCoin, _beneficiary, _vote);
+       proposals[proposalCount] = Proposal(true, _marketAddress, _creator, 0, _milestone, _reward, _deadline, _rewardCoin, _beneficiary, _vote, proposalFee);
 
        proposalCount = proposalCount.add(1);
+
+       coinStore.internalTransferFrom(address(0), _creator, feeAccount, fee);
+       coinStore.internalTransferFrom(address(0),_creator,address(this),proposalFee);
+
+       expireHash[signHash] = true;
        
-       emit NewProposal(proposalCount.sub(1), _marketAddress, msg.sender);
+       emit NewProposal(proposalCount.sub(1), _marketAddress, _creator);
        
    }
 
    function checkProposal(address _marketAddress, address[] memory _rewardCoin, uint256[] memory _reward) internal {
+
         for(uint256 i = 0; i < _rewardCoin.length; i++) {
 
            require(marketTokenBalance[_marketAddress][_rewardCoin[i]] != 0);
@@ -250,13 +246,12 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
 
            require(afterCoinReward <= marketTokenBalance[_marketAddress][_rewardCoin[i]]);
 
-           if (_rewardCoin[i] == SUT) {
-               if (CtStore(_marketAddress).reRecycleRate() > CtStore(_marketAddress).recycleRate()){
+           if (_rewardCoin[i] == SUT && CtStore(_marketAddress).reRecycleRate() > CtStore(_marketAddress).recycleRate()) {              
 
                uint256 preSut = CtStore(_marketAddress).totalSupply().mul(CtStore(_marketAddress).reRecycleRate().sub(CtStore(_marketAddress).recycleRate())).div(10 ** 18);
 
                require(afterCoinReward.add(preSut) <= marketTokenBalance[_marketAddress][_rewardCoin[i]]);
-               }
+               
                
            }
 
@@ -264,13 +259,26 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        }
    }
 
-   function transferProposal(uint256 _proposalId, address newCreator) public onlyStart{
-       require(msg.sender == proposals[_proposalId].creator);
+   function transferProposal(uint256 _proposalId, address rawCreator, address newCreator, uint256 fee, bytes memory sign) public onlyStart {
+       require(admin.onlyAdmin(msg.sender));
+
+       bytes32 signHash = keccak256(abi.encodePacked(_proposalId, rawCreator, newCreator, fee)); 
+
+       require(ecrecovery(signHash, sign) == rawCreator);
+
+       require(!expireHash[signHash]);
+
+       require(rawCreator == proposals[_proposalId].creator);
        
        require(CtStore(proposals[_proposalId].market).migrationTarget() == address(0));
 
        proposals[_proposalId].creator = newCreator;
 
+       coinStore.internalTransferFrom(address(0), rawCreator, feeAccount, fee);
+
+       expireHash[signHash] = true;
+
+       emit TransferProposal(_proposalId,rawCreator, newCreator);
    }
 
    function getPropsoalStatus(uint256 _proposalId) public view returns(bool) {
@@ -305,7 +313,7 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        return  proposals[_proposalId].rewardCoin;
    }
 
-   function getProposalBeneficiary(uint256 _proposalId) public  view returns(address payable[] memory) {
+   function getProposalBeneficiary(uint256 _proposalId) public view returns(address[] memory) {
        return  proposals[_proposalId].beneficiary;
    }
 
@@ -317,49 +325,112 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        return proposals[_proposalId].votedetails[_stage];
    }
 
+   function getProposalFee(uint256 _proposalId) public view returns(uint256) {
+       return proposals[_proposalId].fee;
+   }
+
    function isVoteForProposal(address _voter, uint256 _proposalId, uint8 _milestone) public view returns(bool) {
        return isVote[_voter][_proposalId][_milestone];
    }
    
 
-   function modifyProposal(uint256 _proposalId, uint8 _milestone, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory _beneficiary) public onlyStart{
-       require(msg.sender == proposals[_proposalId].creator);
+   function modifyProposal(uint256 _proposalId, address _creator, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address[] memory _beneficiary, uint256 fee, bytes memory sign) public onlyStart{
+       require(admin.onlyAdmin(msg.sender));
+
+       bytes32 signHash = keccak256(abi.encodePacked(_proposalId, _creator, fee)); 
+
+       require(!expireHash[signHash]);
+
+       require(ecrecovery(signHash, sign) == _creator);
+
+       require(_creator == proposals[_proposalId].creator);
+
        require(proposals[_proposalId].active);
+       
        require(CtStore(proposals[_proposalId].market).migrationTarget() == address(0));
+
+       
 
        address _marketAddress = proposals[_proposalId].market;
 
-       require(!CtStore(_marketAddress).dissolved());
+       changeNewProposal(_proposalId,_marketAddress,_creator,_reward,_deadline,_rewardCoin,_beneficiary);
 
-       checkModProposal(_proposalId, _marketAddress, _milestone, _reward,_deadline, _rewardCoin, _beneficiary);
+    //    require(!CtStore(_marketAddress).dissolved());
 
-       uint8 nowStage = proposals[_proposalId].stage;
+    //    uint8 nowStage = proposals[_proposalId].stage;
 
-       Proposal memory s = proposals[_proposalId];
+    //    uint8 _milestone = proposals[_proposalId].milestone;
 
-       uint256[] memory newVote = new uint256[](_milestone);
+    //    checkModProposal(_proposalId,_marketAddress, _reward,_deadline, _rewardCoin,_beneficiary, nowStage, _milestone);
 
-       for(uint8 i = 0; i <= nowStage; i++) {
+    //    Proposal memory s = proposals[_proposalId];
 
-           _reward[i] = s.reward[i];
+    //    uint256[] memory newVote = new uint256[](_milestone);
 
-           _deadline[i] = s.deadline[i];
+    //    for(uint8 i = 0; i <= nowStage; i++) {
 
-           _rewardCoin[i] = s.rewardCoin[i];
+    //        _reward[i] = s.reward[i];
 
-           _beneficiary[i] = s.beneficiary[i];
+    //        _deadline[i] = s.deadline[i];
 
-           newVote = s.vote;
+    //        _rewardCoin[i] = s.rewardCoin[i];
 
-       }
+    //        _beneficiary[i] = s.beneficiary[i];
 
-       Proposal memory np = Proposal(true, _marketAddress, msg.sender, nowStage, _milestone, _reward, _deadline, _rewardCoin, _beneficiary, newVote);
+    //        newVote = s.vote;
 
-       proposals[_proposalId] = np;
+    //    }
+       
+
+    // //   Proposal memory np = Proposal(true, _marketAddress, _creator, nowStage, _milestone, _reward, _deadline, _rewardCoin, _beneficiary, newVote, proposals[_proposalId].fee);
+
+    // // //   proposals[_proposalId] = np;
+
+      coinStore.internalTransferFrom(address(0), _creator, feeAccount, fee);
+
+      expireHash[signHash] = true;
+
+       emit ModifierProposal(_proposalId);
+
+    }
+    
+    
+    function changeNewProposal(uint256 _proposalId, address _marketAddress, address _creator, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin,address[] memory _beneficiary) private {
+         require(!CtStore(_marketAddress).dissolved());
+
+         Proposal memory s = proposals[_proposalId];
+
+         uint8 nowStage = s.stage;
+
+         uint8 milestone = s.milestone;
+
+         uint256 _fee = s.fee;
+
+         checkModProposal(_proposalId,_marketAddress, _reward,_deadline, _rewardCoin,_beneficiary, nowStage, milestone);
+
+         uint256[] memory newVote = new uint256[](milestone);
+           
+        for(uint8 i = 0; i <= nowStage; i++) {
+
+            _reward[i] = s.reward[i];
+
+            _deadline[i] = s.deadline[i];
+
+            _rewardCoin[i] = s.rewardCoin[i];
+
+            _beneficiary[i] = s.beneficiary[i];
+
+            newVote = s.vote;
+
+        }
+
+        Proposal memory np = Proposal(true, _marketAddress, _creator, nowStage, milestone, _reward, _deadline, _rewardCoin, _beneficiary, newVote, _fee);
+
+        proposals[_proposalId] = np;
+
     }
 
-    function checkModProposal(uint256 _proposalId, address _marketAddress, uint8 _milestone, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address payable[] memory  _beneficiary) internal {
-       uint8 nextStage =  proposals[_proposalId].stage + 1;
+    function checkModProposal(uint256 _proposalId, address _marketAddress, uint256[] memory _reward, uint256[] memory _deadline, address[] memory _rewardCoin, address[] memory  _beneficiary, uint8 nextStage, uint8 _milestone) internal {
 
        require(_milestone >= nextStage);
        require(_milestone == _reward.length);
@@ -384,7 +455,15 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
 
    }
 
-   function vote(uint256 _proposalId)public onlyStart {
+   function vote(uint256 _proposalId, address voter, uint256 fee, uint256 timeStamp, bytes memory sign)public onlyStart {
+       require(admin.onlyAdmin(msg.sender));
+       
+       bytes32 signHash = keccak256(abi.encodePacked(_proposalId, voter, fee,timeStamp)); 
+
+       require(!expireHash[signHash]);
+
+       require(ecrecovery(signHash, sign) == voter);
+
        require(proposals[_proposalId].active);
        
        address marketAddress = proposals[_proposalId].market;
@@ -394,27 +473,42 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        uint8 nowStage = proposals[_proposalId].stage;
 
        if (nowStage == 0) {
-           require (CtStore(marketAddress).isAdmin(msg.sender) || proposals[_proposalId].votedetails[0].length > CtStore(marketAddress).adminSize().div(2));
-           require (CtStore(marketAddress).containsHolder(msg.sender));
+           require (CtStore(marketAddress).isAdmin(voter) || proposals[_proposalId].votedetails[0].length > CtStore(marketAddress).adminSize().div(2));
+           require (CtStore(marketAddress).containsHolder(voter));
 
        }else {
-           require(CtStore(marketAddress).containsHolder(msg.sender));
+           require(CtStore(marketAddress).containsHolder(voter));
        }
 
        require(block.timestamp < proposals[_proposalId].deadline[nowStage]);
 
-       require(!isVote[msg.sender][_proposalId][nowStage]);
+       require(!isVote[voter][_proposalId][nowStage]);
 
-       uint256 voterBalance = ex.balanceOf(marketAddress, msg.sender).add(Token(marketAddress).balanceOf(msg.sender));
+       uint256 voterBalance = coinStore.balanceOf(marketAddress, voter).add(Token(marketAddress).balanceOf(voter));
 
        proposals[_proposalId].vote[nowStage] = proposals[_proposalId].vote[nowStage].add(voterBalance);
 
-       proposals[_proposalId].votedetails[nowStage].push(msg.sender);
+       proposals[_proposalId].votedetails[nowStage].push(voter);
 
-       isVote[msg.sender][_proposalId][nowStage] = true;
+       isVote[voter][_proposalId][nowStage] = true;
+
+       coinStore.internalTransferFrom(address(0), voter, feeAccount, fee);
+
+       expireHash[signHash] = true;
+
+       emit VoteForPropsoal(voter, _proposalId, nowStage);
    }
 
-   function conclusionVote(uint256 _proposalId) public onlyStart {
+   function conclusionVote(uint256 _proposalId, address concluder, uint256 fee, uint256 timeStamp, bytes memory sign) public onlyStart {
+
+       require(admin.onlyAdmin(msg.sender));
+       
+       bytes32 signHash = keccak256(abi.encodePacked(_proposalId, concluder, fee,timeStamp)); 
+
+       require(!expireHash[signHash]);
+
+       require(ecrecovery(signHash, sign) == concluder);
+
        require(proposals[_proposalId].active);
 
        address marketAddress = proposals[_proposalId].market;
@@ -430,20 +524,24 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        if (nowStage == 0) {
            uint256 adminVote = proposals[_proposalId].votedetails[nowStage].length;
 
-           if(adminVote > CtStore(marketAddress).adminSize().div(2)) {
+           if(adminVote > CtStore(marketAddress).adminSize().div(uint256(2))) {
 
-               if(proposals[_proposalId].vote[nowStage] > CtStore(marketAddress).totalSupply().div(2)){
+               if(proposals[_proposalId].vote[nowStage] > CtStore(marketAddress).totalSupply().div(uint256(2))){
+
+                  coinStore.internalTransfer(token,proposals[_proposalId].beneficiary[nowStage],proposals[_proposalId].reward[nowStage]);
               
-               if(token == address(0)) {
-                   proposals[_proposalId].beneficiary[nowStage].transfer(proposals[_proposalId].reward[nowStage]);
-               }else {
-                   Token(token).transfer(proposals[_proposalId].beneficiary[nowStage], proposals[_proposalId].reward[nowStage]);
-               }
+            //    if(token == address(0)) {
+            //        coinStore.internalTransfer(address(0),address(this),proposals[_proposalId].beneficiary[nowStage],proposals[_proposalId].reward[nowStage]);
+            //        proposals[_proposalId].beneficiary[nowStage].transfer(proposals[_proposalId].reward[nowStage]);
+            //    }else {
+            //        Token(token).transfer(proposals[_proposalId].beneficiary[nowStage], proposals[_proposalId].reward[nowStage]);
+            //    }
 
                marketTokenBalance[marketAddress][token] = marketTokenBalance[marketAddress][token].sub(proposals[_proposalId].reward[nowStage]);
                marketCurrentReward[marketAddress][token] = marketCurrentReward[marketAddress][token].sub(proposals[_proposalId].reward[nowStage]);
 
                proposals[_proposalId].stage += 1;
+               
                }else{
                     proposalFailed(_proposalId, nowStage);
                }
@@ -455,12 +553,14 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        }else {
            uint256 _vote = proposals[_proposalId].vote[nowStage];
 
-           if (_vote > CtStore(marketAddress).totalSupply().div(2)) {
-               if(token == address(0)) {
-                   proposals[_proposalId].beneficiary[nowStage].transfer(proposals[_proposalId].reward[nowStage]);
-               }else {
-                   Token(token).transfer(proposals[_proposalId].beneficiary[nowStage], proposals[_proposalId].reward[nowStage]);
-               }
+           if (_vote > CtStore(marketAddress).totalSupply().div(uint256(2))) {
+
+               coinStore.internalTransfer(address(0),proposals[_proposalId].beneficiary[nowStage],proposals[_proposalId].reward[nowStage]);
+            //    if(token == address(0)) {
+            //        proposals[_proposalId].beneficiary[nowStage].transfer(proposals[_proposalId].reward[nowStage]);
+            //    }else {
+            //        Token(token).transfer(proposals[_proposalId].beneficiary[nowStage], proposals[_proposalId].reward[nowStage]);
+            //    }
 
                marketTokenBalance[marketAddress][token] = marketTokenBalance[marketAddress][token].sub(proposals[_proposalId].reward[nowStage]);
                marketCurrentReward[marketAddress][token] = marketCurrentReward[marketAddress][token].sub(proposals[_proposalId].reward[nowStage]);
@@ -470,10 +570,19 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
                proposalFailed(_proposalId, nowStage);
            }
        }
+
+       coinStore.internalTransferFrom(address(0),concluder,feeAccount,fee);
+
+       coinStore.internalTransfer(address(0),concluder,ONE_MILESTONE_FEE);
+
+       expireHash[signHash] = true;
    }
 
    function proposalFailed(uint256 _proposalId, uint8 _stage) private {
        proposals[_proposalId].active = false;
+
+       uint8 remainMilestone = proposals[_proposalId].milestone - (_stage + 1);
+       address _creator = proposals[_proposalId].creator;
        
        address _market = proposals[_proposalId].market;
        uint256[] memory _reward = proposals[_proposalId].reward;
@@ -482,41 +591,64 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
        for(uint256 i = uint256(_stage); i < _reward.length; i++) {
            marketCurrentReward[_market][_rewardCoin[i]] = marketCurrentReward[_market][_rewardCoin[i]].sub(_reward[i]);
        }
+
+       coinStore.internalTransfer(address(0),_creator, ONE_MILESTONE_FEE * remainMilestone);
    }
 
 
-   function withDraw(address _marketAddress) public {
-       require(CtStore(_marketAddress).containsHolder(msg.sender));
+   function withDraw(address _marketAddress, address drawer, uint256 fee, uint256 timeStamp, bytes memory sign) public {
+       require(admin.onlyAdmin(msg.sender));
+       
+       bytes32 signHash = keccak256(abi.encodePacked(_marketAddress, drawer, fee,timeStamp)); 
+
+       require(!expireHash[signHash]);
+
+       require(ecrecovery(signHash, sign) == drawer);
+
+       require(CtStore(_marketAddress).containsHolder(drawer));
        require(CtStore(_marketAddress).dissolved());
-       require(!isWithdraw[msg.sender][_marketAddress]);
+       require(!isWithdraw[drawer][_marketAddress]);
 
        address[] memory tokens = marketRecived[_marketAddress].list();
 
        for (uint256 i = 0; i < tokens.length; i++) {
-           uint256 value = marketTokenBalance[_marketAddress][tokens[i]].mul(ex.balanceOf(_marketAddress, msg.sender)).div(Token(_marketAddress).totalSupply());
-           if(tokens[i] == address(0)) {
-
-               msg.sender.transfer(value);
-
-           }else {
-               Token(tokens[i]).transfer(msg.sender,value);
-           }
+           uint256 value = marketTokenBalance[_marketAddress][tokens[i]].mul(coinStore.balanceOf(_marketAddress,drawer)).div(Token(_marketAddress).totalSupply());
+           
+           coinStore.internalTransfer(tokens[i], drawer, value);
+        
        }
 
-       isWithdraw[msg.sender][_marketAddress] = true;
+       isWithdraw[drawer][_marketAddress] = true;
+       expireHash[signHash] = true;
    }
 
-   function withdrawForRecyRate(uint256 value) public {
-       require(sutStore.creator(msg.sender) != address(0));
-       require(marketTokenBalance[msg.sender][SUT] >= value);
-       require(CtStore(msg.sender).migrationTarget() == address(0));
+//    function withdrawForRecyRate(uint256 value) public {
+//        require(sutStore.creator(msg.sender) != address(0));
+//        require(marketTokenBalance[msg.sender][SUT] >= value);
+//        require(CtStore(msg.sender).migrationTarget() == address(0));
+       
+//        coinStore.internalTransfer(SUT, address(this), msg.sender, value);
+//        marketTokenBalance[msg.sender][SUT] = marketTokenBalance[msg.sender][SUT].sub(value);
+//    }
 
-       Token(address(SUT)).transfer(msg.sender, value);
-   }
+//    function recycleTransfer(uint256 withdrawSut, address draw) public {
+//        require(sutStore.creator(msg.sender) != address(0));
+//        require(CtStore(msg.sender).migrationTarget() == address(0));
+       
+//        marketTokenBalance[msg.sender][SUT] = marketTokenBalance[msg.sender][SUT].add(value);
+//    }
 
-   function upgradeMarketExchange(address rawAddress, address newAddress)public {
+   function upgradeMarketExchange(address rawAddress, address newAddress, address upgrader, uint256 fee, uint256 timeStamp, bytes memory sign) public {
        require(CtStore(rawAddress).totalMigrated() == CtStore(rawAddress).sizeHolder());
        require(newAddress == CtStore(rawAddress).migrationTarget());
+
+       require(admin.onlyAdmin(msg.sender));
+       
+       bytes32 signHash = keccak256(abi.encodePacked(rawAddress, newAddress, upgrader,fee,timeStamp)); 
+
+       require(!expireHash[signHash]);
+
+       require(ecrecovery(signHash, sign) == upgrader);
 
        address[] memory tokens = marketRecived[rawAddress].list();
 
@@ -524,6 +656,8 @@ function donateERC20(address marketAddress, address erc20Address, uint256 value)
            marketTokenBalance[newAddress][tokens[i]] = marketTokenBalance[rawAddress][tokens[i]];
            marketTokenBalance[rawAddress][tokens[i]] = 0;
        }
+
+       coinStore.internalTransferFrom(address(0),upgrader,feeAccount,fee);
    }
 
 }

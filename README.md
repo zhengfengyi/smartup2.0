@@ -368,7 +368,7 @@ uint256 _sourceAmount    吃单者卖出的数量，比如吃单者为买CT， �
 吃一笔单建议gas: 300,000 以此类推
 ```
 
-#### 12. 给市场所在的提案捐赠ETH（调用Proposal 合约）
+#### 12. 给市场所在的提案捐赠代币（调用Proposal 合约）
 
 ```
 function donateCoinToProposal(address _token, address _donator, address _marketAddress, uint256 _value, uint256 _fee, uint256 timeStamp, bytes memory sign) public
@@ -676,26 +676,6 @@ bytes memory sign  签名
 签名来源：_proposalId, concluder, fee,timeStamp
 ```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #### 29.市场解散后市场的人领取属于市场的币(调用Proposal 合约)
 
 ```
@@ -784,5 +764,293 @@ function migrate(uint256 batchSize) whenMigrating external
 参数说明： 
 uint256 batchSize  转移的人数
 
+```
+
+#### 37.flag 标记市场
+
+```
+function flagCtMarket(address ctAddress, address flager, uint256 flagDeposit, uint256 ffee, uint256 tFee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0x80db18fa
+
+参数说明：
+address ctAddress  flag的ct市场地址
+address flager  flager地址
+uint256 flagDeposit flager的押金
+uint256 ffee 第一个flager 用于总结投票的费用，后面的flager则为0；
+uint256 tFee  交易手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+事件：
+Flagging(address _projectAddress, address _flagger, uint256 _deposit, uint256 _totalDeposit);
+
+事件签名：0xf40dc67bc8f2fbc484ae31f9f753e33abdd6c7e8cadcb7ff13a02ce887a46d66
+
+参数说明：
+address _projectAddress  ct市场地址
+address _flagger   flager地址
+uint256 _deposit   押金
+uint256 _totalDeposit  当前flagers的总押金
+
+```
+
+#### 38.当flager押金不够，flag时间截止，关闭flag
+
+```
+function closeFlag(address ctAddress, address closer, uint256 fee, uint256 timeStamp, bytes memory sign) public 
+
+方法签名：0x6bf7ba35
+
+参数说明：
+address ctAddress  市场地址
+address closer 关闭flag的人
+uint256 fee 手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+
+事件：
+CloseFlagging(address _ctAddress, address _closer);
+
+事件签名：0x7b8f50ba65b557767c84921d21d3556eb0a898d90a578f6c3617125ae541b5f5
+
+参数说明：
+address _ctAddress 市场地址
+address _closer 关闭flag的人
+```
+
+#### 39. flag成功后，陪审团投票是否解散市场
+
+```
+function voteForFlag(address ctAddress, address voter, bool dissolve, uint256 fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0x4dca7e56
+
+参数说明：
+address ctAddress 市场地址
+address voter     投票的陪审团地址
+bool dissolve     是否解散市场 true解散， false 不解散
+uint256 fee        手续费
+uint256 timeStamp  时间戳
+bytes memory sign  签名
+
+
+事件：MakeVote (address _ctAddress, address _voter, uint8 _appealRound,  bool _details);
+
+事件签名：0xba814d70afe08e88775f461c52cb74c58a93e18266bc5ff6fcd1125c1d353c1d
+
+参数说明：
+address _ctAddress 市场地址
+address _voter  投票陪审团地址
+uint8 _appealRound  市场投票阶段
+bool _details 是否解散市场 true解散， false 不解散
+```
+
+#### 40 总结市场投票
+
+````
+function concludeVote(address ctAddress, address concluder, uint256 fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0x4e139557
+
+参数说明：
+address ctAddress  市场地址
+address concluder  总结投票的人
+uint256 fee        手续费
+uint256 timeStamp  时间戳
+bytes memory sign  签名
+````
+
+#### 41 申诉市场
+
+```
+function appealMarket(address ctAddress, address appealer, uint256 appealDeposite, uint256 cfee, uint256 fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：
+0x77137b9b
+
+参数说明：
+address ctAddress  市场地址
+address appealer   申诉人的地址
+uint256 appealDeposite  申诉的sut押金
+uint256 cfee     申诉时用于总结市场投票时的手续费
+uint256 fee       申诉手续费
+uint256 timeStamp  时间戳
+bytes memory sign   申诉人的签名
+
+事件：
+AppealMarket(address _ctAddress, address _appealer, uint256 _depositAmount);
+
+事件签名：
+0x7022a122a61833a88b37e7311e964145c539f7077eae76b063f3b9062d48cb46
+
+参数说明：
+address _ctAddress   市场地址
+address _appealer    申诉人的地址
+uint256 _depositAmount   当前申诉市场的sut押金余额
+```
+
+#### 42.申诉市场押金不足时取消申诉
+
+```
+function closeAppeal(address ctAddress, address closer, uint256 fee, uint256 timeStamp, bytes memory sign) public 
+
+方法签名：0xc6dd124d
+
+参数说明：
+address ctAddress  市场地址
+address closer    关闭市场申诉人的地址
+uint256 fee   手续费
+uint256 timeStamp 时间戳
+bytes memory sign  签名
+```
+
+#### 43.市场处于解散状态时没人申诉解散市场
+
+```
+function noAppealerDissovle(address ctAddress, address doer, uint256 fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0x4f5a6e3c
+
+参数说明：
+address ctAddress  市场地址
+address doer  调用人的地址
+uint256 fee  手续费
+uint256 timeStamp 时间戳
+bytes memory sign  签名
+
+```
+
+#### 44. 市场过了第一阶段时间没有全部卖出CT时解散市场
+
+```
+function notSellOutDissovle(address ctAddress, address doer, uint256 fee, uint256 timeStamp, bytes memory sign) public 
+
+方法签名：0xc1be2d4c
+
+
+参数说明：
+address ctAddress  市场地址
+address doer  调用人的地址
+uint256 fee  手续费
+uint256 timeStamp 时间戳
+bytes memory sign  签名
+```
+
+#### 45.市场没有全部卖出ct后，取回sut
+
+```
+function ctNotSellOutBackSut(address ctAddress, address seller, uint256 fee, uint256 timeStamp, bytes memory sign) public 
+
+方法签名：0xb2b95b7b
+
+参数说明：
+address ctAddress  市场地址
+address seller  卖出ct的人
+uint256 fee   手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+```
+
+#### 46.查看市场可以更改的最高回收价
+
+```
+ function getMaxRecycleRate() public view returns(uint256) 
+ 
+ 方法签名：0x1e80ef1e
+ 
+ 返回值：
+ uint256  市场可以更改的最高回收价
+```
+
+#### 47.市场管理员更改回收价
+
+```
+function changeRecycleRate(address marketAddress, address applicant, uint256 rate, uint256 fee, uint256 concludeFee,uint256 timeStamp, bytes memory sign) public
+
+方法签名：0x9b8bc5e3
+
+
+参数说明：
+address marketAddress  市场地址
+address applicant  调用的市场管理员地址
+uint256 rate  更改的回收价
+uint256 fee   手续费
+uint256 concludeFee  用于总结更改投票的手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+```
+
+#### 48.为市场更改回收价投票
+
+```
+function voteForRecycleRate(address marketAddress, address voter, uint256 fee, uint256 timeStamp, bytes memory sign) public 
+
+方法签名：0xbd14a3d6
+
+参数说明：
+address marketAddress  市场地址
+address voter  投票人地址
+uint256 fee  手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+```
+
+#### 49.总结更改市场回收价的投票
+
+```
+function conclusionRecycle(address marketAddress, address concluder, uint256 fee, uint256 timeStamp, bytes memory sign) public
+
+方法签名：0xdb96ef65
+
+
+参数说明：
+address marketAddress  市场地址
+address concluder 总结市场投票人的地址
+uint256 fee  手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+```
+
+#### 50.升级ct市场
+
+```
+function upgradeMarket(address marketAddress, address upgraderAddress, address upgrader, uint256 fee, uint256 timeStamp,bytes memory upgraderSign) public
+
+方法签名：0x625a3c8f
+
+参数说明：
+address marketAddress  市场地址
+address upgraderAddress 升级到的市场地址
+address upgrader  升级的人
+uint256 fee 手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+```
+
+#### 51.设置升级的市场来自A市场
+
+```
+function setMigrateFrom(address marketAddress, address migrateFrom, address upgrader, uint256 fee, uint256 timeStamp, bytes memory upgraderSign) public 
+
+方法签名：0x10af4f8c
+
+参数说明：
+address marketAddress  市场地址
+address upgraderAddress 升级来自A市场地址
+address upgrader  升级的人
+uint256 fee 手续费
+uint256 timeStamp 时间戳
+bytes memory sign 签名
+
+```
+
+#### 52.可以升级市场后，市场里的人迁移代币
+
+```
+function migrate() whenMigrating external
+
+方法签名：0x8fd3ab80
 ```
 

@@ -18,10 +18,7 @@ interface Proposal {
     function marketTokenBalance(address _market, address _token) external view returns(uint256);
     function marketCurrentReward(address _market, address _token) external view returns(uint256);
     function withdrawForRecyRate(uint256 amountSut) external;
-}
-
-interface ISmartIdeaToken {
-    function approveAndCall(address spender, uint256 value, bytes calldata extraData) external returns (bool);
+    function recycleTransfer(uint256 withdrawSut) external;
 }
 
 
@@ -36,11 +33,13 @@ contract CTstore {
     string public symbol;
     
     // address public SUT = ;
-    address public exchange;
+    address public coinStore;
     address public creator;
     address public ctImpl;
     address public proposal;
+    //0x6095d57bF5cAeA98d6A099BDE5B42704053f8E3b
     address public SUT = address(0xF1899c6eB6940021C1aE4E9C3a8e29EE93704b03);
+    //address public SUT = address(0xAB5c5aC1ecCd8b27De3FB95aD679653D43821a52);
 
     // Target contract
     address public migrationTarget = address(0);
@@ -51,6 +50,7 @@ contract CTstore {
     bool public dissolved;
     bool public isRecycleOpen = true;
     bool public isInFirstPeriod;
+    bool public notSelloutDissolved;
     
     uint8 public upgradeState; //normal, prepareUpgrade, upGradeing, finishedUpgrade;
 
@@ -66,6 +66,7 @@ contract CTstore {
     uint256 public reRecycleRate;
     uint256 public recycleStart;
     uint256 public recyclePeriod = 10 minutes;
+    uint256 public recycleFee;
 
     IterableSet.AddressSet private tokenHolders;
     // IterableSet.AddressSet private recivedToken;
@@ -86,10 +87,10 @@ contract CTstore {
     event WithdrawToken(address _token, uint256 _value);
 
 
-    constructor(address _creator, address _ctImpl, address _smartupStore, address _exchange, string memory _name, string memory _symbol, uint256 _totalSupply, uint256 _exchangeRate, uint256 _recycleRate, uint256 _closingTime, address _proposal)public {
+    constructor(address _creator, address _ctImpl, address _smartupStore, address _coinstore, string memory _name, string memory _symbol, uint256 _totalSupply, uint256 _exchangeRate, uint256 _recycleRate, uint256 _closingTime, address _proposal)public {
         creator = _creator;
         ctImpl = _ctImpl;
-        exchange = _exchange;
+        coinStore = _coinstore;
         name = _name;
         symbol = _symbol;
         totalSupply = _totalSupply;
@@ -98,7 +99,7 @@ contract CTstore {
         smartup = ISmartUp(_smartupStore);
         createTime = now;
         closingTime = _closingTime;
-        balanceOf[_exchange] = _totalSupply;
+        balanceOf[_coinstore] = _totalSupply;
 
         if (_totalSupply != 0) {
             isInFirstPeriod = true;
@@ -106,6 +107,7 @@ contract CTstore {
 
         admin.add(_creator);
         proposal = _proposal;
+        
     }
 
     modifier onlyImpl(){
@@ -152,26 +154,19 @@ contract CTstore {
         migrationTarget = target;
         // make sure token holders list won't be updated during migration
         tokenHolders.freeze();
+        
+        
         emit StartMigration(target);
     }
 
-    function migrate(uint256 batchSize) whenMigrating external {
+    function migrate() whenMigrating external {
+        require(tokenHolders.contains(msg.sender));
 
-        uint256 lastPos = totalMigrated.add(batchSize) < tokenHolders.size() ? totalMigrated.add(batchSize) : tokenHolders.size();
+        uint256 amount = balanceOf[msg.sender].add(GetToken(coinStore).balanceOf(address(this),msg.sender));
 
-        for (uint256 i = totalMigrated; i < lastPos; ++i) {
-            address tokenHolder = tokenHolders.at(i);
-            // ignore empty balance
-            if (balanceOf[tokenHolder] > 0) {
-                uint256 amount = balanceOf[tokenHolder].add(GetToken(exchange).balanceOf(address(this),tokenHolder));
-                // finalizeMigration may or may not clear the balance of the token holder 
-              //finalizeMigration(tokenHolder, amount);
+         MigrationTarget(migrationTarget).migrateFrom(msg.sender, amount);
 
-                totalMigrated = i.add(1);
-                MigrationTarget(migrationTarget).migrateFrom(tokenHolder, amount);
-
-            }
-        }
+         tokenHolders.remove(msg.sender);
     }
   
     function setMigrateFrom(address _from) external onlyImpl{
@@ -233,7 +228,7 @@ contract CTstore {
 
 **********************************************************************************/
     function transfer(address to, uint256 amount) public whenMigrationUnstarted returns (bool success) {
-      require(msg.sender == exchange || to == exchange);
+      require(msg.sender == coinStore || to == coinStore);
       require(amount > 0);
 
       balanceOf[msg.sender] = balanceOf[msg.sender].sub(amount);
@@ -245,7 +240,7 @@ contract CTstore {
     } 
 
     function approve(address spender, uint256 value) public whenMigrationUnstarted returns (bool success) {
-        require(msg.sender == exchange || spender == exchange);
+        require(msg.sender == coinStore || spender == coinStore);
 
         allowance[msg.sender][spender] = value;
 
@@ -255,7 +250,7 @@ contract CTstore {
     }
 
     function transferFrom(address from, address to, uint256 value) public whenMigrationUnstarted returns (bool success) {
-        require(from == exchange || to == exchange);
+        require(from == coinStore || to == coinStore);
         require(balanceOf[from] >= value);
         require(allowance[from][msg.sender] >= value);
         require(to != address(0));
@@ -348,6 +343,20 @@ contract CTstore {
 *                                                                                *
 
 **********************************************************************************/
+
+    function notSellOutDissvoled() public onlyImpl {
+        dissolved = true;
+        notSelloutDissolved = true;
+    }
+
+
+    // function fisrstPeriodTransfer(address to, uint256 amount) public {
+    //     require(msg.sender == exchange);
+
+    //     coinStore.internalTransfer(address(this),to,amount);
+    // }
+
+
     // function withdrawSut() public {
     //    require(!isInFirstPeriod);
     //    require(!isWithdraw);
@@ -370,8 +379,8 @@ contract CTstore {
 *                                                                                *
 
 **********************************************************************************/
-   function requestRecycleChange(uint256 _recycle) public {
-       require(isAdmin(msg.sender));       
+   function requestRecycleChange(address applicant, uint256 _recycle, uint256 fee) external onlyImpl {
+       require(isAdmin(applicant));       
        require(!dissolved);
        require(migrationTarget == address(0));
        require(reRecycleRate == 0);
@@ -384,15 +393,13 @@ contract CTstore {
        
        recycleStart = now;
        reRecycleRate = _recycle;
-       adminVote.add(msg.sender);
+       adminVote.add(applicant);
+       recycleFee = fee;
 
-       if (adminVote.size() > adminSize().div(uint256(2))) {
-           requestRecycleSuccess();
-       }
    }
 
    function getMaxRecycleRate() public view returns(uint256) {
-        uint256 amountSut = GetToken(exchange).balanceOf(SUT,address(this)).add(Proposal(proposal).marketTokenBalance(address(this),SUT).sub(Proposal(proposal).marketCurrentReward(address(this),SUT)));
+        uint256 amountSut = GetToken(coinStore).balanceOf(SUT,address(this)).add(Proposal(proposal).marketTokenBalance(address(this),SUT).sub(Proposal(proposal).marketCurrentReward(address(this),SUT)));
         
         uint256 maxRecycleRate = amountSut.mul(10 ** 18).div(totalSupply);
 
@@ -400,54 +407,48 @@ contract CTstore {
 
    }
 
-   function voteForRecycleRate() public {
-       require(isAdmin(msg.sender));
-       require(!adminVote.contains(msg.sender));
+   function voteForRecycleRate(address voter) external onlyImpl{
+       require(isAdmin(voter));
+       require(!adminVote.contains(voter));
        require(now.sub(recycleStart) < recyclePeriod);
 
-       adminVote.add(msg.sender);
-
-       if (adminVote.size() > adminSize().div(uint256(2))) {
-           requestRecycleSuccess();
-       }
+       adminVote.add(voter);
    }
 
-   function requestRecycleSuccess() private {
-
-      if (reRecycleRate > recycleRate) {
-          uint256 transferSut = totalSupply.mul(reRecycleRate.sub(recycleRate)).div(DECIMALS_RATE);
-
-          Proposal(proposal).withdrawForRecyRate(transferSut);
-
-      }else {
-
-          uint256 withdrawSut = totalSupply.mul(recycleRate.sub(reRecycleRate)).div(DECIMALS_RATE);
-
-          GetToken(exchange).ctWithdrawSutToPro(withdrawSut);
-      }
-
-   }
-
-   function conclusionRecycle() public {
+   function conclusionRecycle() public returns(uint8,uint256)  {
       require(reRecycleRate != 0);
       
-      require(now.sub(recycleStart) > recyclePeriod);
+      require(now.sub(recycleStart) > recyclePeriod || adminVote.size() > adminSize().div(uint256(2)));
 
       if(adminVote.size() > adminSize().div(uint256(2))) {
         if (reRecycleRate > recycleRate) {
           uint256 transferSut = totalSupply.mul(reRecycleRate.sub(recycleRate)).div(DECIMALS_RATE);
 
-          ISmartIdeaToken(SUT).approveAndCall(exchange, transferSut, toBytes(address(this)));
+          finishRecycle();
 
-      }else{
+        //   Proposal(proposal).withdrawForRecyRate(transferSut);
+          return(uint8(1),transferSut);
+
+      }else {
 
           uint256 withdrawSut = totalSupply.mul(recycleRate.sub(reRecycleRate)).div(DECIMALS_RATE);
 
-          ISmartIdeaToken(SUT).approveAndCall(proposal, withdrawSut, toBytes(address(this)));
+          finishRecycle();
 
+          return(uint8(2), withdrawSut);
       }
 
+
+      }else {
+          finishRecycle();
+          return(uint8(0),0);
       }
+
+
+
+    }
+
+    function finishRecycle() private {
 
        adminVote.destroy();
 
@@ -456,29 +457,11 @@ contract CTstore {
        reRecycleRate = 0;
 
        recycleStart = 0;
-   }
 
-  function removeRequestRecycle() public {
-      require(reRecycleRate != 0);
-      require(now.sub(recycleStart) > recyclePeriod);
-      require(adminVote.size() <= admin.size().div(2));
+       recycleFee = 0;
 
-        adminVote.destroy();
+    }
 
-        reRecycleRate = 0;
-
-        recycleStart = 0;
-  }  
-
-  function toBytes(address a) internal pure returns (bytes memory b){
-    assembly {
-        let m := mload(0x40)
-        a := and(a, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-        mstore(add(m, 20), xor(0x140000000000000000000000000000000000000000, a))
-        mstore(0x40, add(m, 52))
-        b := m
-  }
-}
 
 }
 
